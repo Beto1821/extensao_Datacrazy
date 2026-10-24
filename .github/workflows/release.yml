@@ -52,7 +52,7 @@ jobs:
           {
             echo "## Mudanças"
             echo
-            git log --no-merges --pretty='- %s' ${range} | grep -v '^- docs:' || echo "- Ajustes internos"
+            git log --no-merges --pretty='- %s' ${range} | grep -Ev '^- (docs|ci|chore):' || echo "- Ajustes internos"
             echo
             echo "## Como atualizar"
             echo
