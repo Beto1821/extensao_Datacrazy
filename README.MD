@@ -162,7 +162,12 @@ Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois,
 | `LEIA-ME.txt` | Instruções de instalação que vão dentro do zip (abre no Bloco de Notas) |
 | `datacrazy-filtro-logs.zip` | Os arquivos acima (menos `DC.png`) empacotados para distribuir |
 
-Ao alterar o código, aumente a versão no `manifest.json` e no `LEIA-ME.txt`, e gere o zip de novo com `manifest.json`, `content.js`, `hook.js`, `styles.css`, `LEIA-ME.txt` e a pasta `icons/` dentro de uma pasta `datacrazy-filtro-logs/`.
+### Publicar uma versão nova
+
+1. Altere o código e aumente a versão no `manifest.json` (e no `LEIA-ME.txt` e no topo deste README).
+2. Faça commit e push para a branch `main`.
+
+A GitHub Action [`release.yml`](.github/workflows/release.yml) percebe a versão nova, monta o `datacrazy-filtro-logs.zip` e cria a release sozinha. O link de download passa a entregar a versão nova na hora. Se a versão já tiver release, a Action não faz nada.
 
 ---
 

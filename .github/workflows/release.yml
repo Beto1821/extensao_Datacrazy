@@ -1,0 +1,78 @@
+# Cria a release automaticamente quando a versão do manifest.json muda.
+# O link .../releases/latest/download/datacrazy-filtro-logs.zip passa a entregar a versão nova.
+name: Release automática
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - manifest.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ler versão do manifest.json
+        id: v
+        run: echo "version=$(jq -r .version manifest.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Verificar se a release já existe
+        id: exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.v.outputs.version }}" >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "Release v${{ steps.v.outputs.version }} já existe, nada a fazer."
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Montar o zip da extensão
+        if: steps.exists.outputs.found == 'false'
+        run: |
+          mkdir -p dist/datacrazy-filtro-logs
+          cp -r LEIA-ME.txt manifest.json hook.js content.js styles.css icons dist/datacrazy-filtro-logs/
+          cd dist && zip -r -X datacrazy-filtro-logs.zip datacrazy-filtro-logs
+          unzip -l datacrazy-filtro-logs.zip
+
+      - name: Escrever notas da release
+        if: steps.exists.outputs.found == 'false'
+        run: |
+          prev=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          range=${prev:+$prev..HEAD}
+          {
+            echo "## Mudanças"
+            echo
+            git log --no-merges --pretty='- %s' ${range} | grep -v '^- docs:' || echo "- Ajustes internos"
+            echo
+            echo "## Como atualizar"
+            echo
+            echo "1. Baixe o **\`datacrazy-filtro-logs.zip\`** em **Assets** e extraia."
+            echo "2. Substitua os arquivos da pasta da extensão pelos novos."
+            echo "3. Em \`chrome://extensions\`, clique na seta de recarregar da extensão e recarregue o Datacrazy (F5)."
+            echo
+            echo "Primeira instalação: veja o \`LEIA-ME.txt\` dentro do zip."
+            echo
+            echo "© $(date +%Y) Adalberto Ribeiro – Time Tigers Datacrazy. Todos os direitos reservados."
+          } > notes.md
+          cat notes.md
+
+      - name: Criar release
+        if: steps.exists.outputs.found == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.v.outputs.version }}" dist/datacrazy-filtro-logs.zip \
+            --title "v${{ steps.v.outputs.version }}" \
+            --notes-file notes.md \
+            --target "${{ github.sha }}" \
+            --latest
