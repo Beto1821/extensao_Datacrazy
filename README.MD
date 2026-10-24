@@ -14,7 +14,13 @@ A instalação leva uns 2 minutos e é feita uma vez só. Siga os passos na orde
 
 ### Passo 1 – Baixe o arquivo da extensão
 
-Baixe o arquivo **`datacrazy-filtro-logs.zip`** (pelo link que você recebeu ou pela pasta onde ele foi compartilhado) e salve no computador.
+Baixe o arquivo **`datacrazy-filtro-logs.zip`** da versão mais recente:
+
+**[⬇ Baixar datacrazy-filtro-logs.zip](https://github.com/Beto1821/extensao_Datacrazy/releases/latest/download/datacrazy-filtro-logs.zip)**
+
+Ou abra a página de [Releases](https://github.com/Beto1821/extensao_Datacrazy/releases) e baixe o zip em **Assets**.
+
+> O repositório é privado: o link só funciona para quem tem acesso a ele no GitHub. Se você recebeu o zip por outro caminho (Drive, WhatsApp), pode usar esse arquivo.
 
 ### Passo 2 – Extraia o arquivo zip
 
