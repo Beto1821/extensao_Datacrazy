@@ -1,0 +1,166 @@
+==============================================================
+  DATACRAZY - FILTRO DE LOGS DO BLOCO  (versão 1.5.1)
+  Como instalar a extensão no Google Chrome
+
+  © 2026 Adalberto Ribeiro - Time Tigers Datacrazy
+==============================================================
+
+A extensão adiciona uma barra de filtro na aba "Logs" do bloco
+do CRM Datacrazy (https://crm.datacrazy.io): filtro por nome,
+telefone, status e período, contatos repetidos e download do
+log em planilha (CSV).
+
+A instalação leva uns 2 minutos e é feita uma vez só.
+
+
+--------------------------------------------------------------
+PASSO 1 - EXTRAIA O ARQUIVO ZIP
+--------------------------------------------------------------
+
+O Chrome NÃO instala o arquivo .zip direto. Ele precisa da
+pasta extraída.
+
+  1. Clique com o botão direito em "datacrazy-filtro-logs.zip".
+  2. Clique em "Extrair tudo..." e depois em "Extrair".
+  3. Vai aparecer a pasta "datacrazy-filtro-logs". Dentro dela
+     devem estar estes arquivos:
+        - manifest.json
+        - content.js
+        - hook.js
+        - styles.css
+        - pasta icons (logo da extensão)
+        - LEIA-ME.txt (este arquivo)
+
+
+--------------------------------------------------------------
+PASSO 2 - COLOQUE A PASTA EM UM LUGAR FIXO
+--------------------------------------------------------------
+
+Mova a pasta "datacrazy-filtro-logs" para um lugar onde ela vai
+ficar para sempre. Exemplo: Documentos\extensoes\
+
+  ATENÇÃO: não apague nem mova essa pasta depois de instalar.
+  O Chrome usa a extensão direto dessa pasta. Se ela sumir,
+  a extensão para de funcionar.
+
+
+--------------------------------------------------------------
+PASSO 3 - ABRA A PÁGINA DE EXTENSÕES DO CHROME
+--------------------------------------------------------------
+
+Na barra de endereço do Chrome, digite o endereço abaixo e
+tecle Enter:
+
+    chrome://extensions
+
+
+--------------------------------------------------------------
+PASSO 4 - ATIVE O "MODO DO DESENVOLVEDOR"
+--------------------------------------------------------------
+
+No canto SUPERIOR DIREITO da página, ligue a chave
+"Modo do desenvolvedor". Vão aparecer novos botões no topo.
+
+
+--------------------------------------------------------------
+PASSO 5 - CARREGUE A EXTENSÃO
+--------------------------------------------------------------
+
+  1. Clique no botão "Carregar sem compactação", no canto
+     SUPERIOR ESQUERDO.
+  2. Na janela que abrir, entre na pasta "datacrazy-filtro-logs"
+     (a pasta que tem o arquivo manifest.json dentro).
+  3. Clique em "Selecionar pasta".
+
+
+--------------------------------------------------------------
+PASSO 6 - CONFIRA SE INSTALOU
+--------------------------------------------------------------
+
+A extensão "Datacrazy – Filtro de Logs do Bloco" aparece na
+lista, com a chave LIGADA (azul).
+
+Opcional: clique no ícone de quebra-cabeça ao lado da barra de
+endereço e fixe a extensão.
+
+
+--------------------------------------------------------------
+PASSO 7 - TESTE NO DATACRAZY
+--------------------------------------------------------------
+
+  1. Acesse https://crm.datacrazy.io e faça login.
+     Se a página já estava aberta, tecle F5 para recarregar.
+  2. Abra um bloco e vá na aba "Logs".
+  3. A barra de filtro aparece acima da lista de logs.
+
+Pronto, a extensão está instalada.
+
+
+==============================================================
+  COMO USAR A BARRA
+==============================================================
+
+  Campo de busca ....... Filtra por nome, telefone ou status.
+                         Vírgula busca vários termos ("OU").
+                         Exemplo: maria, 11999999999
+  De / Até ............. Filtra por período (data e hora).
+  Únicos por telefone .. Mostra só um log por telefone.
+  Só repetidos ......... Mostra só contatos que aparecem mais
+                         de uma vez.
+  Auto ................. Ligado: ao abrir um bloco, já carrega
+                         o log inteiro sozinho (com aviso de
+                         carregando e botão Cancelar).
+  Carregar tudo ........ Busca o log inteiro do bloco direto
+                         no Datacrazy (leva poucos segundos).
+  Baixar CSV ........... Baixa o log em planilha (.csv) com o
+                         filtro aplicado. Sem filtro, baixa todo
+                         o log da aba selecionada.
+  Limpar ............... Remove todos os filtros.
+
+O CSV vai para a pasta Downloads e abre direto no Excel.
+IMPORTANTE: o Datacrazy guarda só 7 dias de log. Datas mais
+antigas que isso não trazem nada (a barra mostra um aviso).
+
+
+==============================================================
+  PROBLEMAS COMUNS
+==============================================================
+
+* Não aparece o botão "Carregar sem compactação"
+    -> Ative o "Modo do desenvolvedor" (passo 4).
+
+* Erro "Manifest file is missing or unreadable"
+    -> A pasta escolhida não é a que tem o manifest.json.
+       Às vezes o Windows cria uma pasta dentro de outra ao
+       extrair: entre até a pasta que tem os arquivos.
+
+* Erro "Manifest is not valid JSON" ou
+  "Could not load javascript 'content.js'"
+    -> Algum arquivo está faltando ou com nome trocado
+       (ex.: "manifest (2).json"). Extraia o zip de novo.
+
+* A barra não aparece no Datacrazy
+    -> Confira se a extensão está ligada em chrome://extensions
+       e recarregue a página do Datacrazy (F5).
+
+* Aviso "Desativar extensões no modo desenvolvedor" ao abrir
+  o Chrome
+    -> É normal. Feche o aviso (NÃO clique em desativar).
+
+
+==============================================================
+  ATUALIZAR / REMOVER
+==============================================================
+
+Atualizar: extraia o zip novo, substitua os arquivos da pasta
+da extensão, abra chrome://extensions, clique na seta circular
+(recarregar) no card da extensão e tecle F5 no Datacrazy.
+
+Remover: abra chrome://extensions e clique em "Remover" no card
+da extensão. Depois apague a pasta, se quiser.
+
+
+==============================================================
+  © 2026 Adalberto Ribeiro - Time Tigers Datacrazy.
+  Todos os direitos reservados.
+==============================================================

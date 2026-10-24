@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Datacrazy – Filtro de Logs do Bloco",
+  "version": "1.5.1",
+  "description": "Adiciona uma barra de filtro (nome, telefone, período, duplicados) na aba Logs do bloco do CRM Datacrazy.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Datacrazy – Filtro de Logs do Bloco"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://crm.datacrazy.io/*"
+      ],
+      "js": [
+        "hook.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://crm.datacrazy.io/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
