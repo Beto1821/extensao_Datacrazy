@@ -1,5 +1,5 @@
 // Datacrazy – Filtro de Logs do Bloco
-// Detecta as listas de logs (cards com data + "Lead:" + "Contato:") e insere uma barra de filtro acima.
+// Detecta as listas de logs (cards que começam com data) e insere uma barra de filtro acima.
 // "Carregar tudo" e "Baixar CSV" buscam o log inteiro direto na API (rota capturada pelo hook.js);
 // se a API falhar, caem para o modo antigo (rolar a lista até o fim).
 
@@ -33,11 +33,9 @@
     // (ex.: seletor "Última semana") não derrubam a lista carregada pela extensão.
     const key = reqKey(d.url);
     for (const [list, a] of api) if (a.key !== key) exitApi(list);
-    if (auto && ![...api.values()].some(a => a.key === key)) {
-      pendingAuto = key;
-      clearTimeout(t);
-      t = setTimeout(scan, 300); // a lista pode já estar na tela sem novas mutações
-    }
+    if (auto && ![...api.values()].some(a => a.key === key)) pendingAuto = key;
+    clearTimeout(t);
+    t = setTimeout(scan, 300); // a lista pode já estar na tela (e cards sem Lead só valem agora)
   });
   window.postMessage({ source: "dcf-content", type: "get-last" }, location.origin);
 
@@ -65,7 +63,7 @@
   function parseLines(card) {
     const lines = card.innerText.split("\n").map(s => s.trim()).filter(Boolean);
     const m = (lines[0] || "").match(DATE_RE);
-    if (!m || !lines.includes("Contato:")) return null;
+    if (!m) return null;
     const date = new Date(+m[3], MONTHS[m[2].toLowerCase()] ?? 0, +m[1], +m[4], +m[5]);
     const after = label => {
       const i = lines.indexOf(label);
@@ -84,7 +82,9 @@
 
   function findCards(root = document) {
     return [...root.querySelectorAll("div.cursor-pointer.rounded-lg")]
-      .filter(el => DATE_RE.test((el.textContent || "").trim()) && el.textContent.includes("Contato:"));
+      // card com data no topo; sem "Lead:"/"Contato:" (ex.: execução agendada) só vale depois que
+      // a rota de logs foi vista, para não pegar listas de outras telas do CRM
+      .filter(el => DATE_RE.test((el.textContent || "").trim()) && (lastReq || /Lead:|Contato:/.test(el.textContent)));
   }
 
   // ---------- leitura da API ----------
@@ -233,18 +233,21 @@
     const from = state.from ? new Date(state.from) : null;
     const to = state.to ? new Date(state.to) : null;
     const freq = {};
-    items.forEach(it => { const k = it.phone || it.lead; freq[k] = (freq[k] || 0) + 1; });
+    // repetido = mesmo telefone; sem telefone (ex.: só Lead), usa o nome
+    // log sem telefone, lead e contato (ex.: execução agendada) nunca conta como repetido
+    const keyOf = it => it.phone || it.lead || it.contact || "";
+    items.forEach(it => { const k = keyOf(it); if (k) freq[k] = (freq[k] || 0) + 1; });
     const seen = new Set();
     for (const it of items) {
-      const key = it.phone || it.lead;
+      const key = keyOf(it);
       let ok = true;
       if (terms.length && !terms.some(t => it.text.includes(t))) ok = false;
       if (from && it.date < from) ok = false;
       if (to && it.date > to) ok = false;
-      if (state.onlyDup && freq[key] < 2) ok = false;
-      if (ok && state.unique) { if (seen.has(key)) ok = false; else seen.add(key); }
+      if (state.onlyDup && !(freq[key] > 1)) ok = false;
+      if (ok && state.unique && key) { if (seen.has(key)) ok = false; else seen.add(key); }
       it.visible = ok;
-      it.count = freq[key];
+      it.count = freq[key] || 1;
     }
     return items;
   }
