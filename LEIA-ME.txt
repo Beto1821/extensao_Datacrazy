@@ -96,6 +96,15 @@ PASSO 7 - TESTE NO DATACRAZY
 Pronto, a extensão está instalada.
 
 
+--------------------------------------------------------------
+DOWNLOAD DA VERSÃO MAIS RECENTE
+--------------------------------------------------------------
+
+Este link baixa sempre a última versão da extensão:
+
+    https://github.com/Beto1821/extensao_Datacrazy/releases/latest/download/datacrazy-filtro-logs.zip
+
+
 ==============================================================
   COMO USAR A BARRA
 ==============================================================
@@ -152,7 +161,7 @@ antigas que isso não trazem nada (a barra mostra um aviso).
   ATUALIZAR / REMOVER
 ==============================================================
 
-Atualizar: extraia o zip novo, substitua os arquivos da pasta
+Atualizar: baixe o zip novo pelo link acima, extraia, substitua os arquivos da pasta
 da extensão, abra chrome://extensions, clique na seta circular
 (recarregar) no card da extensão e tecle F5 no Datacrazy.
 

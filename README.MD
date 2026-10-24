@@ -115,7 +115,7 @@ Se uma página demorar mais de 30 segundos, a extensão tenta de novo (até 3 ve
 
 ## Atualizar para uma nova versão
 
-1. Baixe e extraia o novo `datacrazy-filtro-logs.zip` (passos 1 e 2).
+1. Baixe o zip mais recente em [https://github.com/Beto1821/extensao_Datacrazy/releases/latest/download/datacrazy-filtro-logs.zip](https://github.com/Beto1821/extensao_Datacrazy/releases/latest/download/datacrazy-filtro-logs.zip) e extraia (passos 1 e 2).
 2. Substitua todo o conteúdo da pasta da extensão (arquivos e pasta `icons`) pelo novo.
 3. Abra `chrome://extensions` e clique no ícone de recarregar (seta circular) no card da extensão.
 4. Recarregue a página do Datacrazy (F5).
