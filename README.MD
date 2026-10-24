@@ -18,7 +18,7 @@ Baixe o arquivo **`datacrazy-filtro-logs.zip`** da versão mais recente:
 
 **[⬇ Baixar datacrazy-filtro-logs.zip](https://github.com/Beto1821/extensao_Datacrazy/releases/latest/download/datacrazy-filtro-logs.zip)**
 
-Ou abra a página de [Releases](https://github.com/Beto1821/extensao_Datacrazy/releases) e baixe o zip em **Assets**.
+Ou abra a [última versão](https://github.com/Beto1821/extensao_Datacrazy/releases/latest) e baixe o zip em **Assets**.
 
 > O repositório é privado: o link só funciona para quem tem acesso a ele no GitHub. Se você recebeu o zip por outro caminho (Drive, WhatsApp), pode usar esse arquivo.
 
