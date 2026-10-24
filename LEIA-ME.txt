@@ -1,5 +1,5 @@
 ==============================================================
-  DATACRAZY - FILTRO DE LOGS DO BLOCO  (versão 1.5.2)
+  DATACRAZY - FILTRO DE LOGS DO BLOCO  (versão 1.6.0)
   Como instalar a extensão no Google Chrome
 
   © 2026 Adalberto Ribeiro - Time Tigers Datacrazy
@@ -108,6 +108,10 @@ Este link baixa sempre a última versão da extensão:
 ==============================================================
   COMO USAR A BARRA
 ==============================================================
+
+No topo do painel de logs há o seletor "Clássico | Crazy":
+  Crazy ..... barra de filtro + log completo, com cores (padrão)
+  Clássico .. painel original do Datacrazy, sem a extensão
 
   Campo de busca ....... Filtra por nome, telefone ou status.
                          Vírgula busca vários termos ("OU").

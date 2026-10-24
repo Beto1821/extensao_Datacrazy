@@ -23,6 +23,10 @@
   let pendingAuto = null; // bloco/aba que acabou de abrir e ainda não foi carregado pela API
   let auto = true;        // "Carregar tudo" sozinho ao abrir um bloco/aba
   try { auto = localStorage.getItem("dcf-auto") !== "0"; } catch {}
+  // "crazy" = barra + lista da extensão; "classic" = painel original do Datacrazy, sem nada da extensão
+  let mode = "crazy";
+  try { mode = localStorage.getItem("dcf-mode") === "classic" ? "classic" : "crazy"; } catch {}
+  const toggles = new Map(); // list element -> seletor Clássico/Crazy
 
   // ---------- captura da rota (mensagens do hook.js) ----------
   window.addEventListener("message", e => {
@@ -33,7 +37,7 @@
     // (ex.: seletor "Última semana") não derrubam a lista carregada pela extensão.
     const key = reqKey(d.url);
     for (const [list, a] of api) if (a.key !== key) exitApi(list);
-    if (auto && ![...api.values()].some(a => a.key === key)) pendingAuto = key;
+    if (auto && mode === "crazy" && ![...api.values()].some(a => a.key === key)) pendingAuto = key;
     clearTimeout(t);
     t = setTimeout(scan, 300); // a lista pode já estar na tela (e cards sem Lead só valem agora)
   });
@@ -99,6 +103,7 @@
     const phone = r.contactId || "";
     return {
       id: `${r.flowSessionId}|${r.createdAt}`, date, dateText: fmtDate(date), status, lead, contact, phone,
+      type: r.type, errorCode: r.errorCode || "",
       text: [fmtDate(date), status, lead, contact, phone, r.message].join(" ").toLowerCase()
     };
   }
@@ -258,6 +263,11 @@
   }
 
   function apply(list) {
+    if (mode === "classic") {
+      // devolve os cards ao estado original da página
+      for (const c of findCards(list)) { delete c.dataset.dcfHidden; delete c.dataset.dcfCount; }
+      return [];
+    }
     const a = api.get(list);
     if (a) return renderApi(list, a);
     const items = filterItems(findCards(list).map(parseCard).filter(Boolean));
@@ -273,15 +283,69 @@
   // ---------- lista própria (dados da API) ----------
   const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
+  // tipo do log -> classe de cor + rótulo curto
+  const KIND = { succeeded: ["ok", "✓ Sucesso"], entered: ["in", "→ Entrou"], warning: ["warn", "! Alerta"],
+                 alert: ["warn", "! Alerta"], error: ["err", "✕ Erro"], failed: ["err", "✕ Erro"] };
+  const WEEKDAY = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+  function fmtPhone(p) {
+    const d = String(p).replace(/\D/g, "");
+    const m = d.match(/^55(\d{2})(\d{4,5})(\d{4})$/);
+    return m ? `+55 (${m[1]}) ${m[2]}-${m[3]}` : d ? `+${d}` : "";
+  }
+
+  // cor fixa por nome (mesmo lead = mesma cor)
+  function hue(s) {
+    let h = 0;
+    for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360;
+    return h;
+  }
+
+  function dayLabel(d) {
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diff = Math.round((today - day) / 864e5);
+    const dm = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+    return diff === 0 ? `Hoje · ${dm}` : diff === 1 ? `Ontem · ${dm}` : `${WEEKDAY[d.getDay()]}, ${dm}`;
+  }
+
+  function itemHtml(it) {
+    const [kind, label] = KIND[it.type] || ["neutral", it.status || "—"];
+    const name = it.lead || it.contact || fmtPhone(it.phone) || "(sem lead)";
+    const sub = it.lead && it.contact && it.contact !== it.lead ? `<div class="dcf-sub">Contato: ${escHtml(it.contact)}</div>` : "";
+    const time = `${pad(it.date.getHours())}:${pad(it.date.getMinutes())}`;
+    return `
+      <div class="dcf-item dcf-k-${kind}">
+        <div class="dcf-av" style="--h:${hue(name)}">${escHtml((name.match(/[\p{L}\d]/u) || ["?"])[0].toUpperCase())}</div>
+        <div class="dcf-main">
+          <div class="dcf-l1"><span class="dcf-name">${escHtml(name)}</span><span class="dcf-time">${time}</span></div>
+          ${sub}
+          <div class="dcf-l2">
+            ${it.phone ? `<span class="dcf-phone">${escHtml(fmtPhone(it.phone))}</span>` : ""}
+            <span class="dcf-pill">${escHtml(label)}${it.errorCode ? ` · ${escHtml(it.errorCode)}` : ""}</span>
+            ${it.count > 1 ? `<span class="dcf-rep">repetido ${it.count}x</span>` : ""}
+          </div>
+        </div>
+      </div>`;
+  }
+
   function renderApi(list, a) {
     const items = filterItems(a.items);
     const vis = items.filter(i => i.visible);
-    a.view.innerHTML = vis.slice(0, MAX_RENDER).map(it => `
-      <div class="dcf-item"${it.count > 1 ? ` data-dcf-count="${it.count}"` : ""}>
-        <div class="dcf-item-top"><span>${escHtml(it.dateText)}</span><span class="dcf-status">${escHtml(it.status)}</span></div>
-        <div>${[it.lead && `<b>Lead:</b> ${escHtml(it.lead)}`, it.contact && `<b>Contato:</b> ${escHtml(it.contact)}`].filter(Boolean).join(" · ")}</div>
-        <div class="dcf-phone">${escHtml(it.phone)}</div>
-      </div>`).join("") || `<div class="dcf-empty">Nenhum log no filtro.</div>`;
+    const shown = vis.slice(0, MAX_RENDER);
+    // separador por dia, com a contagem de logs visíveis daquele dia
+    const perDay = {};
+    for (const it of vis) { const k = it.date.toDateString(); perDay[k] = (perDay[k] || 0) + 1; }
+    let html = "", lastDay = "";
+    for (const it of shown) {
+      const k = it.date.toDateString();
+      if (k !== lastDay) {
+        html += `<div class="dcf-day"><span>${dayLabel(it.date)}</span><span>${perDay[k].toLocaleString("pt-BR")}</span></div>`;
+        lastDay = k;
+      }
+      html += itemHtml(it);
+    }
+    a.view.innerHTML = html || `<div class="dcf-empty">Nenhum log no filtro.</div>`;
     setCount(list, vis.length, items.length,
       (vis.length > MAX_RENDER ? ` (tela: ${MAX_RENDER})` : "") + (a.error ? ` – incompleto: ${a.error}` : ""));
     return items;
@@ -363,6 +427,7 @@
   }
 
   async function loadEverything(list, btn) {
+    if (mode === "classic") return [];
     const my = ++loadSeq; // se outra carga começar depois, esta é descartada
     let userCancel = false;
     const cancelled = () => userCancel || my !== loadSeq;
@@ -505,19 +570,53 @@
     });
   }
 
+  // ---------- seletor Clássico / Crazy ----------
+  function makeToggle() {
+    const el = document.createElement("div");
+    el.className = "dcf-mode";
+    el.innerHTML = `<button data-m="classic" title="Painel original do Datacrazy">Clássico</button><button data-m="crazy" title="Barra de filtro e log completo">Crazy</button>`;
+    el.querySelectorAll("[data-m]").forEach(b => (b.onclick = () => setMode(b.dataset.m)));
+    return el;
+  }
+
+  function setMode(m) {
+    if (m === mode) return;
+    mode = m;
+    try { localStorage.setItem("dcf-mode", m); } catch {}
+    if (m === "classic") loadSeq++; // descarta carga em andamento
+    for (const [list, bar] of bars) {
+      if (m === "classic") exitApi(list);
+      bar.classList.toggle("dcf-off", m === "classic");
+      apply(list);
+    }
+    updateToggles();
+    // voltou ao Crazy com o automático ligado: carrega a lista visível
+    if (m === "crazy" && auto && lastReq) pendingAuto = reqKey(lastReq.url);
+    scan();
+  }
+
+  function updateToggles() {
+    toggles.forEach(el => el.querySelectorAll("[data-m]").forEach(b => b.classList.toggle("dcf-on", b.dataset.m === mode)));
+  }
+
   // ---------- observar o DOM (SPA) ----------
   function scan() {
     // remove barras órfãs
     for (const [list, bar] of bars) {
-      if (!list.isConnected) { exitApi(list); bar.remove(); bars.delete(list); }
+      if (!list.isConnected) { exitApi(list); bar.remove(); bars.delete(list); toggles.get(list)?.remove(); toggles.delete(list); }
     }
     const lists = new Set(findCards().map(c => c.parentElement));
     for (const list of lists) {
       if (!bars.has(list)) {
         const bar = makeBar(list);
+        const toggle = makeToggle();
+        list.parentElement.insertBefore(toggle, list);
         list.parentElement.insertBefore(bar, list); // fora do container do React
         list.parentElement.classList.add("dcf-host"); // CSS respeita o atributo [hidden] das abas inativas
+        bar.classList.toggle("dcf-off", mode === "classic");
         bars.set(list, bar);
+        toggles.set(list, toggle);
+        updateToggles();
         updateRetentionNote();
       }
       if (!api.has(list)) apply(list); // lista da API só muda com filtro, não com o DOM da página
@@ -534,7 +633,7 @@
 
   let t;
   new MutationObserver(muts => {
-    if (muts.every(m => m.target.closest?.(".dcf-bar, .dcf-list"))) return;
+    if (muts.every(m => m.target.closest?.(".dcf-bar, .dcf-list, .dcf-mode"))) return;
     clearTimeout(t);
     t = setTimeout(scan, 300);
   }).observe(document.body, { childList: true, subtree: true });
