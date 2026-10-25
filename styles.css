@@ -32,8 +32,9 @@
   background: transparent;
   color: inherit;
   font-size: 12px;
-  color-scheme: dark light;
+  color-scheme: light; /* ícone do calendário segue o tema do Datacrazy */
 }
+html.dark .dcf-bar input { color-scheme: dark; }
 .dcf-bar label { display: flex; gap: 4px; align-items: center; cursor: pointer; white-space: nowrap; }
 .dcf-bar button {
   padding: 4px 10px;
@@ -197,3 +198,171 @@
 .dcf-mode button.dcf-on { background: #3b82f6; color: #fff; opacity: 1; }
 .dcf-bar button[data-a="csv"] { background: #3b82f6; border-color: #3b82f6; color: #fff; }
 .dcf-bar button[data-a="csv"]:hover { background: #2563eb; }
+
+/* item clicável: desenha o caminho da sessão nos blocos */
+.dcf-list .dcf-item[data-sid] { cursor: pointer; }
+.dcf-item.dcf-sel { background: rgba(59, 130, 246, .14); border-color: rgba(59, 130, 246, .55); border-left-color: var(--k); }
+.dcf-db {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: -3px -4px -3px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  opacity: .55;
+  cursor: pointer;
+}
+.dcf-db:hover { opacity: 1; background: rgba(128, 128, 128, .2); color: #3b82f6; }
+
+/* modal de inspeção da sessão */
+.dcf-modal-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, .55);
+  font-size: 12px;
+}
+.dcf-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 100%);
+  height: min(80vh, 760px);
+  border-radius: 12px;
+  border: 1px solid rgba(128, 128, 128, .3);
+  background: var(--dcf-mbg, Canvas);
+  color: var(--dcf-mfg, CanvasText);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .45);
+  overflow: hidden;
+}
+.dcf-mhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(128, 128, 128, .22);
+}
+.dcf-mtitle { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+.dcf-msub { margin-top: 2px; opacity: .6; font-size: 11px; font-variant-numeric: tabular-nums; }
+.dcf-mtools { display: flex; gap: 6px; align-items: center; }
+.dcf-mtools > button, .dcf-seg button {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(128, 128, 128, .35);
+  background: rgba(128, 128, 128, .12);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+}
+.dcf-mtools > button:hover { background: rgba(128, 128, 128, .25); }
+.dcf-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; border: 1px solid rgba(128, 128, 128, .35); }
+.dcf-seg button { border: 0; background: transparent; opacity: .7; }
+.dcf-seg button.dcf-on { background: #3b82f6; color: #fff; opacity: 1; }
+.dcf-mbody { flex: 1; min-height: 0; display: grid; grid-template-columns: 200px 1fr; }
+.dcf-mnav { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-right: 1px solid rgba(128, 128, 128, .22); overflow-y: auto; }
+.dcf-mnav button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-size: 12px;
+}
+.dcf-mnav button:hover { background: rgba(128, 128, 128, .12); }
+.dcf-mnav button.dcf-on { background: rgba(59, 130, 246, .14); border-color: rgba(59, 130, 246, .45); color: #3b82f6; }
+.dcf-mnav button span { opacity: .6; font-size: 11px; color: var(--dcf-mfg, CanvasText); }
+.dcf-mcontent { min-width: 0; overflow: auto; padding: 12px 16px; }
+.dcf-mcontent .dcf-empty { display: flex; align-items: center; gap: 8px; }
+.dcf-raw {
+  margin: 0;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.dcf-tree { font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.dcf-tree summary { cursor: pointer; list-style: none; }
+.dcf-tree summary::-webkit-details-marker { display: none; }
+.dcf-tree summary::before { content: "▸"; display: inline-block; width: 14px; opacity: .6; }
+.dcf-tree details[open] > summary::before { content: "▾"; }
+.dcf-tin { margin-left: 6px; padding-left: 12px; border-left: 1px solid rgba(128, 128, 128, .25); }
+.dcf-tr { padding-left: 14px; word-break: break-word; }
+.dcf-tk { color: #a855f7; margin-right: 6px; }
+.dcf-tk::after { content: ":"; opacity: .6; }
+.dcf-tn { opacity: .5; }
+.dcf-t-string { color: #16a34a; }
+.dcf-t-number { color: #ea580c; }
+.dcf-t-boolean, .dcf-t-null { color: #3b82f6; }
+.dcf-hrow {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 0 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, .22);
+  border-left: 3px solid #3b82f6;
+}
+.dcf-hrow.dcf-herr { border-left-color: #ef4444; }
+.dcf-hpos { grid-row: span 2; align-self: center; font-weight: 700; opacity: .7; }
+.dcf-hname { font-weight: 600; font-size: 13px; }
+.dcf-hmeta { opacity: .65; font-size: 11px; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .dcf-mbody { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .dcf-mnav { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid rgba(128, 128, 128, .22); }
+}
+
+/* campo de data com "folhinha de mesa" + botão Escolher */
+/* min-width: com o botão "Escolher" a data e a hora não cabem em meio painel, então cada campo vai para a sua linha */
+.dcf-date { position: relative; flex: 1 1 280px; min-width: 0; display: flex; align-items: center; }
+.dcf-date-lbl { flex: none; width: 32px; font-size: 11px; font-weight: 600; opacity: .7; }
+.dcf-bar .dcf-date input[type="datetime-local"] { width: 100%; height: 36px; padding-right: 104px; cursor: pointer; }
+.dcf-date input[type="datetime-local"]::-webkit-calendar-picker-indicator { display: none; }
+.dcf-bar .dcf-date-pill {
+  position: absolute;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 4px;
+  border: none;
+  border-radius: 7px;
+  background: #fcebeb;
+  color: #a32d2d;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s;
+}
+.dcf-bar .dcf-date-pill:hover { background: #f7c1c1; }
+.dcf-date-pill:focus-visible { outline: 2px solid #e24b4a; outline-offset: 2px; }
+html.dark .dcf-bar .dcf-date-pill { background: rgba(226, 75, 74, .18); color: #f09595; }
+html.dark .dcf-bar .dcf-date-pill:hover { background: rgba(226, 75, 74, .3); }
+.dcf-desk-cal {
+  width: 22px;
+  height: 24px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #d3d1c7;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: transform .15s;
+}
+.dcf-date-pill:hover .dcf-desk-cal { transform: translateY(-1px) rotate(-4deg); }
+.dcf-desk-cal-mes { height: 8px; background: #e24b4a; color: #fff; font-size: 6px; line-height: 8px; text-align: center; font-weight: 600; }
+.dcf-desk-cal-dia { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #2c2c2a; }

@@ -27,6 +27,7 @@
   let mode = "crazy";
   try { mode = localStorage.getItem("dcf-mode") === "classic" ? "classic" : "crazy"; } catch {}
   const toggles = new Map(); // list element -> seletor Clássico/Crazy
+  let selSession = null;     // sessão cujo caminho está desenhado sobre os blocos
 
   // ---------- captura da rota (mensagens do hook.js) ----------
   window.addEventListener("message", e => {
@@ -102,7 +103,7 @@
     const contact = (r.contactName || "").trim();
     const phone = r.contactId || "";
     return {
-      id: `${r.flowSessionId}|${r.createdAt}`, date, dateText: fmtDate(date), status, lead, contact, phone,
+      id: `${r.flowSessionId}|${r.createdAt}`, sessionId: r.flowSessionId || "", date, dateText: fmtDate(date), status, lead, contact, phone,
       type: r.type, errorCode: r.errorCode || "",
       text: [fmtDate(date), status, lead, contact, phone, r.message].join(" ").toLowerCase()
     };
@@ -315,10 +316,10 @@
     const sub = it.lead && it.contact && it.contact !== it.lead ? `<div class="dcf-sub">Contato: ${escHtml(it.contact)}</div>` : "";
     const time = `${pad(it.date.getHours())}:${pad(it.date.getMinutes())}`;
     return `
-      <div class="dcf-item dcf-k-${kind}">
+      <div class="dcf-item dcf-k-${kind}${it.sessionId && it.sessionId === selSession ? " dcf-sel" : ""}" data-sid="${escHtml(it.sessionId)}">
         <div class="dcf-av" style="--h:${hue(name)}">${escHtml((name.match(/[\p{L}\d]/u) || ["?"])[0].toUpperCase())}</div>
         <div class="dcf-main">
-          <div class="dcf-l1"><span class="dcf-name">${escHtml(name)}</span><span class="dcf-time">${time}</span></div>
+          <div class="dcf-l1"><span class="dcf-name">${escHtml(name)}</span><span class="dcf-time">${time}</span>${it.sessionId ? `<button class="dcf-db" title="Inspecionar dados da sessão">${DB_ICON}</button>` : ""}</div>
           ${sub}
           <div class="dcf-l2">
             ${it.phone ? `<span class="dcf-phone">${escHtml(fmtPhone(it.phone))}</span>` : ""}
@@ -355,6 +356,12 @@
     exitApi(list);
     const view = document.createElement("div");
     view.className = "dcf-list";
+    view.onclick = e => {
+      const item = e.target.closest(".dcf-item[data-sid]");
+      if (!item?.dataset.sid) return;
+      if (e.target.closest(".dcf-db")) return void openSession(item.dataset.sid);
+      selectSession(item.dataset.sid);
+    };
     list.parentElement.insertBefore(view, list);
     list.classList.add("dcf-native-off");
     api.set(list, { ...data, view });
@@ -368,6 +375,134 @@
     list.classList.remove("dcf-native-off");
     api.delete(list);
     if (list.isConnected) apply(list);
+  }
+
+  // ---------- sessão do log: caminho nos blocos + inspeção ----------
+  const DB_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>`;
+
+  // mesma ação do card do Clássico; clicar de novo na mesma sessão apaga o caminho (como no Clássico)
+  function selectSession(id) {
+    selSession = selSession === id ? null : id;
+    window.postMessage({ source: "dcf-content", type: "load-session", id }, location.origin);
+    for (const a of api.values())
+      a.view.querySelectorAll(".dcf-item[data-sid]").forEach(el => el.classList.toggle("dcf-sel", el.dataset.sid === selSession));
+  }
+
+  // nome do bloco no editor (o histórico da sessão só traz o id)
+  function blockName(id) {
+    const node = document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
+    return node?.querySelector("span.text-base.font-semibold")?.textContent.trim() || id;
+  }
+
+  // texto que é JSON (ex.: corpo de webhook) vira objeto, para abrir na árvore
+  function unwrap(v) {
+    if (typeof v !== "string" || !/^\s*[{[]/.test(v)) return v;
+    try { return JSON.parse(v); } catch { return v; }
+  }
+
+  function treeHtml(v, key, depth = 0) {
+    v = unwrap(v);
+    const k = key === undefined ? "" : `<span class="dcf-tk">${escHtml(key)}</span>`;
+    if (v && typeof v === "object") {
+      const entries = Object.entries(v);
+      const size = Array.isArray(v) ? `[${entries.length}]` : `{${entries.length}}`;
+      if (!entries.length) return `<div class="dcf-tr">${k}<span class="dcf-tn">${size}</span></div>`;
+      return `<details${depth < 2 ? " open" : ""}><summary>${k}<span class="dcf-tn">${size}</span></summary>
+        <div class="dcf-tin">${entries.map(([ck, cv]) => treeHtml(cv, ck, depth + 1)).join("")}</div></details>`;
+    }
+    const t = v === null ? "null" : typeof v;
+    const txt = t === "string" ? `"${v}"` : String(v);
+    return `<div class="dcf-tr">${k}<span class="dcf-tv dcf-t-${t}">${escHtml(txt)}</span></div>`;
+  }
+
+  function historyHtml(hist) {
+    if (!hist.length) return `<div class="dcf-empty">Sem histórico.</div>`;
+    return hist.map((h, i) => {
+      const a = new Date(h.enteredDate), b = h.exitedDate ? new Date(h.exitedDate) : null;
+      const dur = b ? `${fmtN(b - a)} ms` : "ainda no bloco";
+      return `<div class="dcf-hrow${h.hasErrors ? " dcf-herr" : ""}">
+        <span class="dcf-hpos">${i + 1}º</span>
+        <span class="dcf-hname">${escHtml(blockName(h.flowBlockId))}</span>
+        <span class="dcf-hmeta">${fmtDate(a)}:${pad(a.getSeconds())} · ${dur}${h.hasErrors ? " · com erro" : ""}</span>
+      </div>`;
+    }).join("");
+  }
+
+  async function openSession(id) {
+    document.querySelector(".dcf-modal-bg")?.remove();
+    const bg = document.createElement("div");
+    bg.className = "dcf-modal-bg";
+    // herda as cores do painel do Datacrazy (tema claro ou escuro)
+    const src = getComputedStyle(document.querySelector("#sheet") || document.body);
+    const opaque = c => c && !/rgba\(.*,\s*0\)|transparent/.test(c);
+    if (opaque(src.backgroundColor)) bg.style.setProperty("--dcf-mbg", src.backgroundColor);
+    bg.style.setProperty("--dcf-mfg", src.color);
+    bg.innerHTML = `
+      <div class="dcf-modal" role="dialog" aria-label="Inspeção da sessão">
+        <div class="dcf-mhead">
+          <div><div class="dcf-mtitle">${DB_ICON} Inspeção da sessão</div><div class="dcf-msub">Sessão ${escHtml(id)}</div></div>
+          <div class="dcf-mtools">
+            <div class="dcf-seg"><button data-v="tree" class="dcf-on">Árvore</button><button data-v="raw">Raw</button></div>
+            <button data-a="copy">Copiar JSON</button>
+            <button data-a="close" title="Fechar (Esc)">✕</button>
+          </div>
+        </div>
+        <div class="dcf-mbody">
+          <div class="dcf-mnav"></div>
+          <div class="dcf-mcontent"><div class="dcf-empty"><span class="dcf-spinner"></span> Buscando dados da sessão…</div></div>
+        </div>
+      </div>`;
+    document.body.appendChild(bg);
+    const close = () => { bg.remove(); document.removeEventListener("keydown", onKey, true); };
+    const onKey = e => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+    document.addEventListener("keydown", onKey, true);
+    bg.onclick = e => { if (e.target === bg) close(); };
+    bg.querySelector('[data-a="close"]').onclick = close;
+    const content = bg.querySelector(".dcf-mcontent");
+
+    let data;
+    try {
+      if (!lastReq) throw new Error("rota de logs ainda não capturada");
+      const headers = { ...lastReq.headers };
+      delete headers["x-dz-include-totals"];
+      data = await getJson(`${new URL(lastReq.url).origin}/api/crm/flow-sessions/${encodeURIComponent(id)}/details`, headers);
+    } catch (err) {
+      content.innerHTML = `<div class="dcf-empty">Não foi possível buscar a sessão: ${escHtml(err.message)}</div>`;
+      return;
+    }
+    if (!bg.isConnected) return;
+
+    const { parameters = {}, datasources = {}, history = [], ...meta } = data || {};
+    const sections = [
+      { name: "Sessão/metadados", value: meta },
+      { name: "Parâmetros", value: parameters },
+      { name: "Datasources", value: datasources },
+      { name: "Histórico", value: history, html: () => historyHtml(history) }
+    ];
+    const count = v => Array.isArray(v) ? `${v.length} itens` : `${Object.keys(v || {}).length} chaves`;
+    let cur = 0, view = "tree";
+    const nav = bg.querySelector(".dcf-mnav");
+    nav.innerHTML = sections.map((s, i) => `<button data-i="${i}"><b>${s.name}</b><span>${count(s.value)}</span></button>`).join("");
+    const render = () => {
+      const s = sections[cur];
+      nav.querySelectorAll("[data-i]").forEach(b => b.classList.toggle("dcf-on", +b.dataset.i === cur));
+      bg.querySelectorAll("[data-v]").forEach(b => b.classList.toggle("dcf-on", b.dataset.v === view));
+      content.innerHTML = view === "raw"
+        ? `<pre class="dcf-raw">${escHtml(JSON.stringify(s.value, null, 2))}</pre>`
+        : s.html ? s.html()
+        : `<div class="dcf-tree">${Object.entries(s.value || {}).map(([k, v]) => treeHtml(v, k)).join("") || `<div class="dcf-empty">Vazio.</div>`}</div>`;
+    };
+    nav.onclick = e => { const b = e.target.closest("[data-i]"); if (b) { cur = +b.dataset.i; render(); } };
+    bg.querySelectorAll("[data-v]").forEach(b => (b.onclick = () => { view = b.dataset.v; render(); }));
+    const copy = bg.querySelector('[data-a="copy"]');
+    copy.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(sections[cur].value, null, 2));
+        copy.textContent = "Copiado";
+      } catch { copy.textContent = "Falhou"; }
+      setTimeout(() => (copy.textContent = "Copiar JSON"), 1200);
+    };
+    render();
   }
 
   // ---------- ações ----------
@@ -500,8 +635,8 @@
         <input type="text" data-k="q" placeholder="Filtrar por nome, telefone ou status (vírgula = OU)">
       </div>
       <div class="dcf-row">
-        <input type="datetime-local" data-k="from" title="De">
-        <input type="datetime-local" data-k="to" title="Até">
+        ${dateField("from", "De", "Escolher data inicial")}
+        ${dateField("to", "Até", "Escolher data final")}
       </div>
       <div class="dcf-note" hidden></div>
       <div class="dcf-row">
@@ -519,6 +654,7 @@
     const min = retentionStart(), p2 = n => String(n).padStart(2, "0");
     const minStr = `${min.getFullYear()}-${p2(min.getMonth() + 1)}-${p2(min.getDate())}T00:00`;
     bar.querySelectorAll('input[type="datetime-local"]').forEach(i => (i.min = minStr));
+    initFolhinhas(bar);
     bar.querySelectorAll("[data-k]").forEach(inp => {
       const k = inp.dataset.k;
       if (inp.type === "checkbox") inp.checked = state[k]; else inp.value = state[k];
@@ -547,10 +683,42 @@
       // o estado é global: limpa os campos de todas as barras, não só desta
       bars.forEach((b, l) => {
         b.querySelectorAll("[data-k]").forEach(i => (i.type === "checkbox" ? (i.checked = false) : (i.value = "")));
+        b.querySelectorAll(".dcf-date input").forEach(i => i.dispatchEvent(new Event("change"))); // folhinha volta para hoje
         apply(l);
       });
     };
     return bar;
+  }
+
+  // campo de data com "folhinha de mesa": mostra mês/dia escolhidos (vazio = hoje) e abre o seletor.
+  // Sem id: há uma barra por aba, então o botão acha o input pelo próprio campo.
+  const MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
+  const dateField = (k, title, label) => `
+    <div class="dcf-date">
+      <span class="dcf-date-lbl">${title}:</span>
+      <input type="datetime-local" data-k="${k}" title="${title}">
+      <button type="button" class="dcf-date-pill" aria-label="${label}">
+        <span class="dcf-desk-cal" aria-hidden="true"><span class="dcf-desk-cal-mes"></span><span class="dcf-desk-cal-dia"></span></span>
+        <span class="dcf-date-pill-txt">Escolher</span>
+      </button>
+    </div>`;
+
+  function initFolhinhas(root) {
+    root.querySelectorAll(".dcf-date").forEach(field => {
+      const input = field.querySelector("input"), btn = field.querySelector(".dcf-date-pill");
+      const mes = btn.querySelector(".dcf-desk-cal-mes"), dia = btn.querySelector(".dcf-desk-cal-dia");
+      const atualizar = () => {
+        const d = input.value ? new Date(input.value) : new Date();
+        mes.textContent = MESES[d.getMonth()];
+        dia.textContent = d.getDate();
+      };
+      const abrir = () => { try { input.showPicker(); } catch { input.focus(); } };
+      btn.addEventListener("click", abrir);
+      input.addEventListener("click", abrir);
+      input.addEventListener("change", atualizar);
+      input.addEventListener("input", atualizar);
+      atualizar();
+    });
   }
 
   // o Datacrazy só guarda 7 dias: avisa quando o período escolhido sai dessa janela
@@ -633,7 +801,7 @@
 
   let t;
   new MutationObserver(muts => {
-    if (muts.every(m => m.target.closest?.(".dcf-bar, .dcf-list, .dcf-mode"))) return;
+    if (muts.every(m => m.target.closest?.(".dcf-bar, .dcf-list, .dcf-mode, .dcf-modal-bg"))) return;
     clearTimeout(t);
     t = setTimeout(scan, 300);
   }).observe(document.body, { childList: true, subtree: true });

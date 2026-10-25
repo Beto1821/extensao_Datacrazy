@@ -2,7 +2,7 @@
 
 Extensão para Google Chrome que adiciona uma barra de filtro na aba **Logs** do bloco do CRM Datacrazy (`https://crm.datacrazy.io`). Com ela você filtra os logs por nome, telefone, status e período, encontra contatos repetidos e baixa o resultado em planilha (CSV).
 
-Versão atual: **1.6.0**
+Versão atual: **1.7.0**
 
 Desenvolvido por **Adalberto Ribeiro** – Time Tigers Datacrazy.
 
@@ -27,18 +27,22 @@ Ou abra a [última versão](https://github.com/Beto1821/extensao_Datacrazy/relea
 1. Abra a pasta **Downloads** (ou onde o arquivo foi salvo).
 2. Clique com o botão direito em `datacrazy-filtro-logs.zip`.
 3. Clique em **Extrair tudo...** e depois em **Extrair**.
-4. Vai aparecer a pasta **`datacrazy-filtro-logs`**. Dentro dela devem estar estes itens:
+4. Vai aparecer a pasta **`datacrazy-filtro-logs`** com:
+   - `LEIA-ME.txt`: as instruções de instalação (fora da pasta da extensão, para achar fácil).
+   - pasta **`extensao-datacrazy`**: a extensão.
+5. Dentro da pasta `extensao-datacrazy` devem estar estes itens:
    - `manifest.json`
    - `content.js`
    - `hook.js`
    - `styles.css`
    - pasta `icons` (logo da extensão)
+   - `LEIA-ME.txt` (cópia das instruções)
 
 > **Importante:** o Chrome não instala o arquivo `.zip` direto. Ele precisa da pasta extraída.
 
 ### Passo 3 – Coloque a pasta em um lugar fixo
 
-Mova a pasta `datacrazy-filtro-logs` para um lugar onde ela vai ficar para sempre, por exemplo `Documentos\extensoes\`.
+Mova a pasta `extensao-datacrazy` para um lugar onde ela vai ficar para sempre, por exemplo `Documentos\extensoes\`.
 
 > **Não apague nem mova essa pasta depois de instalar.** O Chrome usa a extensão direto dessa pasta. Se ela sumir, a extensão para de funcionar.
 
@@ -57,7 +61,7 @@ No canto **superior direito** da página, ligue a chave **Modo do desenvolvedor*
 ### Passo 6 – Carregue a extensão
 
 1. Clique no botão **Carregar sem compactação**, no canto **superior esquerdo**.
-2. Na janela que abrir, entre na pasta `datacrazy-filtro-logs` (a que tem o `manifest.json` dentro).
+2. Na janela que abrir, entre na pasta `extensao-datacrazy` (a que tem o `manifest.json` dentro).
 3. Clique em **Selecionar pasta**.
 
 ### Passo 7 – Confira se instalou
@@ -86,7 +90,7 @@ A escolha fica salva no navegador. No modo Crazy, acima de cada lista de logs (E
 | Item | O que faz |
 | ---- | --------- |
 | **Campo de busca** | Filtra por nome, telefone ou status. Use vírgula para buscar vários termos de uma vez (funciona como "OU"). Exemplo: `maria, 11999999999`. |
-| **De / Até** | Filtra os logs por período (data e hora). Depois de **Carregar tudo**, mudar **De** ou **Até** busca de novo direto no Datacrazy com esse período. **O Datacrazy guarda só 7 dias de log**: datas mais antigas não trazem nada, e a barra mostra um aviso. |
+| **De: / Até:** | Filtra os logs por período (data e hora). Clique no campo ou no botão vermelho **Escolher** (folhinha com o mês e o dia escolhidos; vazio = hoje) para abrir o calendário. Só com **De:**, vem até o log mais recente. Depois de **Carregar tudo**, mudar **De** ou **Até** busca de novo direto no Datacrazy com esse período. **O Datacrazy guarda só 7 dias de log**: datas mais antigas não trazem nada, e a barra mostra um aviso. |
 | **Únicos por telefone** | Mostra só um log por telefone. |
 | **Só repetidos** | Mostra só os contatos que aparecem mais de uma vez. |
 | **Auto** | Ligado (padrão): ao abrir um bloco ou trocar de aba, a extensão já carrega o log inteiro sozinha. Desligue para carregar só quando clicar em **Carregar tudo**. A escolha fica salva. |
@@ -100,6 +104,8 @@ Outros detalhes:
 - Os cards repetidos ganham a etiqueta **"repetido Nx"**.
 - O contador **"Mostrando X de Y"** indica quantos logs passaram no filtro.
 - O filtro continua valendo ao trocar entre as abas Entraram, Sucessos, Alertas e Erros.
+- **Clique num log** da lista: o Datacrazy desenha o caminho daquela sessão em cima dos blocos (ordem e horário em que entrou em cada um), igual ao card do modo Clássico. Clique de novo no mesmo log para apagar.
+- **Ícone de banco de dados** no log: abre a inspeção da sessão, com os metadados, os parâmetros, os datasources e o histórico de blocos (nome, horário e tempo em cada bloco). Mostra em árvore ou JSON puro (**Raw**), e o botão **Copiar JSON** copia a seção aberta.
 
 ### Sobre o arquivo CSV
 
@@ -121,13 +127,13 @@ Se uma página demorar mais de 30 segundos, a extensão tenta de novo (até 3 ve
 ## Atualizar para uma nova versão
 
 1. Baixe o zip mais recente em [https://github.com/Beto1821/extensao_Datacrazy/releases/latest/download/datacrazy-filtro-logs.zip](https://github.com/Beto1821/extensao_Datacrazy/releases/latest/download/datacrazy-filtro-logs.zip) e extraia (passos 1 e 2).
-2. Substitua todo o conteúdo da pasta da extensão (arquivos e pasta `icons`) pelo novo.
+2. Copie o conteúdo da nova pasta `extensao-datacrazy` (arquivos e pasta `icons`) por cima da pasta da extensão que você já usa.
 3. Abra `chrome://extensions` e clique no ícone de recarregar (seta circular) no card da extensão.
 4. Recarregue a página do Datacrazy (F5).
 
 ## Remover a extensão
 
-Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois, se quiser, apague a pasta `datacrazy-filtro-logs`.
+Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois, se quiser, apague a pasta `extensao-datacrazy`.
 
 ---
 
@@ -154,13 +160,13 @@ Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois,
 | Arquivo | Conteúdo |
 | ------- | -------- |
 | `manifest.json` | Configuração da extensão (nome, versão, site onde roda) |
-| `content.js` | Código que cria a barra, busca os logs, aplica os filtros e gera o CSV |
-| `hook.js` | Observa a chamada do Datacrazy à rota de logs, para a extensão reaproveitá-la |
-| `styles.css` | Estilo da barra e das etiquetas de repetido |
+| `content.js` | Código que cria a barra, busca os logs, aplica os filtros, gera o CSV e abre a inspeção da sessão |
+| `hook.js` | Observa a chamada do Datacrazy à rota de logs, para a extensão reaproveitá-la, e desenha o caminho da sessão nos blocos ao clicar num log |
+| `styles.css` | Estilo da barra, da lista, dos campos de data e do modal de inspeção |
 | `icons/` | Logo da extensão em 16, 32, 48 e 128 px (gerados a partir de `DC.png`) |
 | `DC.png` | Logo original em alta resolução (não vai no zip) |
-| `LEIA-ME.txt` | Instruções de instalação que vão dentro do zip (abre no Bloco de Notas) |
-| `datacrazy-filtro-logs.zip` | Os arquivos acima (menos `DC.png`) empacotados para distribuir |
+| `LEIA-ME.txt` | Instruções de instalação que vão no zip, na raiz e dentro da pasta da extensão (abre no Bloco de Notas) |
+| `datacrazy-filtro-logs.zip` | Pacote para distribuir: `LEIA-ME.txt` + pasta `extensao-datacrazy` com os arquivos acima (menos `DC.png`) |
 
 ### Publicar uma versão nova
 

@@ -1,5 +1,5 @@
 ==============================================================
-  DATACRAZY - FILTRO DE LOGS DO BLOCO  (versão 1.6.0)
+  DATACRAZY - FILTRO DE LOGS DO BLOCO  (versão 1.7.0)
   Como instalar a extensão no Google Chrome
 
   © 2026 Adalberto Ribeiro - Time Tigers Datacrazy
@@ -22,21 +22,23 @@ pasta extraída.
 
   1. Clique com o botão direito em "datacrazy-filtro-logs.zip".
   2. Clique em "Extrair tudo..." e depois em "Extrair".
-  3. Vai aparecer a pasta "datacrazy-filtro-logs". Dentro dela
-     devem estar estes arquivos:
+  3. Vai aparecer a pasta "datacrazy-filtro-logs" com:
+        - LEIA-ME.txt (este arquivo, as instruções)
+        - pasta "extensao-datacrazy" (a extensão)
+  4. Dentro da pasta "extensao-datacrazy" devem estar:
         - manifest.json
         - content.js
         - hook.js
         - styles.css
         - pasta icons (logo da extensão)
-        - LEIA-ME.txt (este arquivo)
+        - LEIA-ME.txt (cópia destas instruções)
 
 
 --------------------------------------------------------------
 PASSO 2 - COLOQUE A PASTA EM UM LUGAR FIXO
 --------------------------------------------------------------
 
-Mova a pasta "datacrazy-filtro-logs" para um lugar onde ela vai
+Mova a pasta "extensao-datacrazy" para um lugar onde ela vai
 ficar para sempre. Exemplo: Documentos\extensoes\
 
   ATENÇÃO: não apague nem mova essa pasta depois de instalar.
@@ -68,7 +70,7 @@ PASSO 5 - CARREGUE A EXTENSÃO
 
   1. Clique no botão "Carregar sem compactação", no canto
      SUPERIOR ESQUERDO.
-  2. Na janela que abrir, entre na pasta "datacrazy-filtro-logs"
+  2. Na janela que abrir, entre na pasta "extensao-datacrazy"
      (a pasta que tem o arquivo manifest.json dentro).
   3. Clique em "Selecionar pasta".
 
@@ -116,7 +118,11 @@ No topo do painel de logs há o seletor "Clássico | Crazy":
   Campo de busca ....... Filtra por nome, telefone ou status.
                          Vírgula busca vários termos ("OU").
                          Exemplo: maria, 11999999999
-  De / Até ............. Filtra por período (data e hora).
+  De: / Até: ........... Filtra por período (data e hora).
+                         Clique no campo ou no botão vermelho
+                         "Escolher" (folhinha com mês e dia)
+                         para abrir o calendário. Só com "De:",
+                         vem até o log mais recente.
   Únicos por telefone .. Mostra só um log por telefone.
   Só repetidos ......... Mostra só contatos que aparecem mais
                          de uma vez.
@@ -129,6 +135,15 @@ No topo do painel de logs há o seletor "Clássico | Crazy":
                          filtro aplicado. Sem filtro, baixa todo
                          o log da aba selecionada.
   Limpar ............... Remove todos os filtros.
+
+Clique num log da lista: o Datacrazy mostra em cima dos blocos
+o caminho que aquela sessão fez (ordem e horário em cada bloco),
+igual ao modo Clássico. Clique de novo para apagar.
+
+Ícone de banco de dados no log: abre a inspeção da sessão, com
+os dados que passaram pelo flow (metadados, parâmetros,
+datasources e histórico de blocos). Tem visão em árvore ou
+"Raw" (JSON) e o botão "Copiar JSON".
 
 O CSV vai para a pasta Downloads e abre direto no Excel.
 IMPORTANTE: o Datacrazy guarda só 7 dias de log. Datas mais
@@ -165,9 +180,11 @@ antigas que isso não trazem nada (a barra mostra um aviso).
   ATUALIZAR / REMOVER
 ==============================================================
 
-Atualizar: baixe o zip novo pelo link acima, extraia, substitua os arquivos da pasta
-da extensão, abra chrome://extensions, clique na seta circular
-(recarregar) no card da extensão e tecle F5 no Datacrazy.
+Atualizar: baixe o zip novo pelo link acima, extraia e copie o
+conteúdo da nova pasta "extensao-datacrazy" por cima da pasta da
+extensão que você já usa. Depois abra chrome://extensions,
+clique na seta circular (recarregar) no card da extensão e tecle
+F5 no Datacrazy.
 
 Remover: abra chrome://extensions e clique em "Remover" no card
 da extensão. Depois apague a pasta, se quiser.

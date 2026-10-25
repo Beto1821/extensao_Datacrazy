@@ -39,9 +39,11 @@ jobs:
       - name: Montar o zip da extensão
         if: steps.exists.outputs.found == 'false'
         run: |
-          mkdir -p dist/datacrazy-filtro-logs
-          cp -r LEIA-ME.txt manifest.json hook.js content.js styles.css icons dist/datacrazy-filtro-logs/
-          cd dist && zip -r -X datacrazy-filtro-logs.zip datacrazy-filtro-logs
+          # LEIA-ME fora (visível ao extrair) e dentro da pasta da extensão
+          mkdir -p dist/pkg/extensao-datacrazy
+          cp -r LEIA-ME.txt manifest.json hook.js content.js styles.css icons dist/pkg/extensao-datacrazy/
+          cp LEIA-ME.txt dist/pkg/
+          cd dist/pkg && zip -r -X ../datacrazy-filtro-logs.zip LEIA-ME.txt extensao-datacrazy && cd ..
           unzip -l datacrazy-filtro-logs.zip
 
       - name: Escrever notas da release

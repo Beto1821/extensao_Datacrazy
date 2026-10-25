@@ -9,8 +9,22 @@
 
   const send = () => last && window.postMessage({ source: "dcf-hook", type: "logs-request", ...last }, location.origin);
   window.addEventListener("message", e => {
-    if (e.source === window && e.data?.source === "dcf-content" && e.data.type === "get-last") send();
+    if (e.source !== window || e.data?.source !== "dcf-content") return;
+    if (e.data.type === "get-last") send();
+    if (e.data.type === "load-session") loadSession(e.data.id);
   });
+
+  // clique num log da lista Crazy: mesma ação do card do Clássico (mostra o caminho da sessão
+  // em cima dos blocos). A função vem do contexto React do editor de flow.
+  function loadSession(id) {
+    const el = document.querySelector(".react-flow");
+    const fk = el && Object.keys(el).find(k => k.startsWith("__reactFiber"));
+    for (let f = fk && el[fk]; f; f = f.return)
+      for (let d = f.dependencies?.firstContext; d; d = d.next) {
+        const h = d.memoizedValue?.sessionHistory;
+        if (typeof h?.loadSessionHistory === "function") return void h.loadSessionHistory(id).catch(() => {});
+      }
+  }
 
   window.fetch = function (input, init) {
     const p = origFetch.apply(this, arguments);
