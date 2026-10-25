@@ -18,14 +18,14 @@ Baixe o arquivo **`datacrazy-filtro-logs.zip`** da versão mais recente:
 
 **[⬇ Baixar datacrazy-filtro-logs.zip](https://github.com/Beto1821/extensao_Datacrazy/releases/latest/download/datacrazy-filtro-logs.zip)**
 
-Ou abra a [última versão](https://github.com/Beto1821/extensao_Datacrazy/releases/latest) e baixe o zip em **Assets**.
+Ou abra a [última versão](https://github.com/Beto1821/extensao_Datacrazy/releases/latest) e baixe o zip em **Assets**. Lá há dois arquivos com o mesmo conteúdo: `datacrazy-filtro-logs-vX.Y.Z.zip` (com a versão no nome) e `datacrazy-filtro-logs.zip` (nome fixo, usado pelo link acima).
 
 > O repositório é privado: o link só funciona para quem tem acesso a ele no GitHub. Se você recebeu o zip por outro caminho (Drive, WhatsApp), pode usar esse arquivo.
 
 ### Passo 2 – Extraia o arquivo zip
 
 1. Abra a pasta **Downloads** (ou onde o arquivo foi salvo).
-2. Clique com o botão direito em `datacrazy-filtro-logs.zip`.
+2. Clique com o botão direito no zip (`datacrazy-filtro-logs.zip` ou `datacrazy-filtro-logs-vX.Y.Z.zip`).
 3. Clique em **Extrair tudo...** e depois em **Extrair**.
 4. Vai aparecer a pasta **`datacrazy-filtro-logs`** com:
    - `LEIA-ME.txt`: as instruções de instalação (fora da pasta da extensão, para achar fácil).
@@ -174,7 +174,7 @@ Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois,
 1. Altere o código e aumente a versão no `manifest.json` (e no `LEIA-ME.txt` e no topo deste README).
 2. Faça commit e push para a branch `main`.
 
-A GitHub Action [`release.yml`](.github/workflows/release.yml) percebe a versão nova, monta o `datacrazy-filtro-logs.zip` e cria a release sozinha. O link de download passa a entregar a versão nova na hora. Se a versão já tiver release, a Action não faz nada.
+A GitHub Action [`release.yml`](.github/workflows/release.yml) percebe a versão nova, monta o zip e cria a release sozinha, com dois arquivos iguais: `datacrazy-filtro-logs-vX.Y.Z.zip` (versão no nome) e `datacrazy-filtro-logs.zip` (nome fixo). O link `/releases/latest/download/datacrazy-filtro-logs.zip` passa a entregar a versão nova na hora; por isso o arquivo de nome fixo não pode ser renomeado. Se a versão já tiver release, a Action não faz nada.
 
 ---
 

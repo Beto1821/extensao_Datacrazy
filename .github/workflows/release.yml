@@ -45,6 +45,8 @@ jobs:
           cp LEIA-ME.txt dist/pkg/
           cd dist/pkg && zip -r -X ../datacrazy-filtro-logs.zip LEIA-ME.txt extensao-datacrazy && cd ..
           unzip -l datacrazy-filtro-logs.zip
+          # mesma cópia com a versão no nome; a sem versão mantém o link /latest/download fixo
+          cp datacrazy-filtro-logs.zip "datacrazy-filtro-logs-v${{ steps.v.outputs.version }}.zip"
 
       - name: Escrever notas da release
         if: steps.exists.outputs.found == 'false'
@@ -58,7 +60,7 @@ jobs:
             echo
             echo "## Como atualizar"
             echo
-            echo "1. Baixe o **\`datacrazy-filtro-logs.zip\`** em **Assets** e extraia."
+            echo "1. Baixe o **\`datacrazy-filtro-logs-v${{ steps.v.outputs.version }}.zip\`** (ou o \`datacrazy-filtro-logs.zip\`, que é o mesmo arquivo) em **Assets** e extraia."
             echo "2. Substitua os arquivos da pasta da extensão pelos novos."
             echo "3. Em \`chrome://extensions\`, clique na seta de recarregar da extensão e recarregue o Datacrazy (F5)."
             echo
@@ -74,6 +76,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "v${{ steps.v.outputs.version }}" dist/datacrazy-filtro-logs.zip \
+            "dist/datacrazy-filtro-logs-v${{ steps.v.outputs.version }}.zip" \
             --title "v${{ steps.v.outputs.version }}" \
             --notes-file notes.md \
             --target "${{ github.sha }}" \
