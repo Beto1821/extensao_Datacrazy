@@ -150,6 +150,7 @@ Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois,
 | "Mostrando 0 de N" com período preenchido | O período está fora dos últimos 7 dias, que é o que o Datacrazy guarda. Veja o aviso amarelo na barra. |
 | Contador mostra "incompleto" | Uma página do Datacrazy não respondeu. Clique em **Carregar tudo** de novo. |
 | **Carregar tudo** ficou lento (rolando a lista) | A busca direta falhou. Clique no bloco de novo (para o Datacrazy refazer a chamada) e tente outra vez. Se continuar, recarregue a página (F5). |
+| O calendário de **De:** / **Até:** não abre | Versão 1.7.0 tinha esse erro. Atualize para a 1.7.1 ou mais nova (veja [Atualizar](#atualizar-para-uma-nova-versão)) e clique em recarregar no card da extensão. |
 | O Chrome bloqueia o download | Permita downloads para `crm.datacrazy.io` nas configurações do Chrome. |
 | Aviso "Desativar extensões no modo desenvolvedor" ao abrir o Chrome | É normal para extensões instaladas por pasta. Feche o aviso (não clique em desativar). |
 
@@ -161,7 +162,7 @@ Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois,
 | ------- | -------- |
 | `manifest.json` | Configuração da extensão (nome, versão, site onde roda) |
 | `content.js` | Código que cria a barra, busca os logs, aplica os filtros, gera o CSV e abre a inspeção da sessão |
-| `hook.js` | Observa a chamada do Datacrazy à rota de logs, para a extensão reaproveitá-la, e desenha o caminho da sessão nos blocos ao clicar num log |
+| `hook.js` | Observa a chamada do Datacrazy à rota de logs, para a extensão reaproveitá-la, desenha o caminho da sessão nos blocos ao clicar num log e abre o calendário dos campos de data (roda no mundo da página, onde o `showPicker()` do Chrome funciona) |
 | `styles.css` | Estilo da barra, da lista, dos campos de data e do modal de inspeção |
 | `icons/` | Logo da extensão em 16, 32, 48 e 128 px (gerados a partir de `DC.png`) |
 | `DC.png` | Logo original em alta resolução (não vai no zip) |
