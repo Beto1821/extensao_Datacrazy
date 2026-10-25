@@ -2,7 +2,7 @@
 
 Extensão para Google Chrome que adiciona uma barra de filtro na aba **Logs** do bloco do CRM Datacrazy (`https://crm.datacrazy.io`). Com ela você filtra os logs por nome, telefone, status e período, encontra contatos repetidos e baixa o resultado em planilha (CSV).
 
-Versão atual: **1.7.1**
+Versão atual: **1.7.2**
 
 Desenvolvido por **Adalberto Ribeiro** – Time Tigers Datacrazy.
 
@@ -89,7 +89,7 @@ A escolha fica salva no navegador. No modo Crazy, acima de cada lista de logs (E
 
 | Item | O que faz |
 | ---- | --------- |
-| **Campo de busca** | Filtra por nome, telefone ou status. Use vírgula para buscar vários termos de uma vez (funciona como "OU"). Exemplo: `maria, 11999999999`. |
+| **Campo de busca** | Filtra por nome, telefone ou status. Use vírgula para buscar vários termos de uma vez (funciona como "OU"). Exemplo: `maria, 11999999999`. Telefone pode ser digitado ou colado do jeito que aparece no card (`+55 (47) 93618-3266`, `(47) 93618-3266`, `93618-3266`): a busca compara só os números. |
 | **De: / Até:** | Filtra os logs por período (data e hora). Clique no campo ou no botão vermelho **Escolher** (folhinha com o mês e o dia escolhidos; vazio = hoje) para abrir o calendário. Só com **De:**, vem até o log mais recente. Depois de **Carregar tudo**, mudar **De** ou **Até** busca de novo direto no Datacrazy com esse período. **O Datacrazy guarda só 7 dias de log**: datas mais antigas não trazem nada, e a barra mostra um aviso. |
 | **Únicos por telefone** | Mostra só um log por telefone. |
 | **Só repetidos** | Mostra só os contatos que aparecem mais de uma vez. |

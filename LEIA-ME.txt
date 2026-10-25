@@ -1,5 +1,5 @@
 ==============================================================
-  DATACRAZY - FILTRO DE LOGS DO BLOCO  (versão 1.7.1)
+  DATACRAZY - FILTRO DE LOGS DO BLOCO  (versão 1.7.2)
   Como instalar a extensão no Google Chrome
 
   © 2026 Adalberto Ribeiro - Time Tigers Datacrazy
@@ -118,6 +118,9 @@ No topo do painel de logs há o seletor "Clássico | Crazy":
   Campo de busca ....... Filtra por nome, telefone ou status.
                          Vírgula busca vários termos ("OU").
                          Exemplo: maria, 11999999999
+                         Telefone pode ser colado como aparece
+                         no card: +55 (47) 93618-3266 (a busca
+                         compara só os números).
   De: / Até: ........... Filtra por período (data e hora).
                          Clique no campo ou no botão vermelho
                          "Escolher" (folhinha com mês e dia)

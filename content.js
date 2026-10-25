@@ -235,7 +235,11 @@
 
   // ---------- filtro ----------
   function filterItems(items) {
-    const terms = state.q.toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
+    const terms = state.q.toLowerCase().split(",").map(s => s.trim()).filter(Boolean).map(t => ({
+      t,
+      // telefone colado do card ("+55 (47) 93618-3266"): compara só os dígitos
+      digits: /^[\d\s()+\-.]+$/.test(t) && t.replace(/\D/g, "").length >= 4 ? t.replace(/\D/g, "") : ""
+    }));
     const from = state.from ? new Date(state.from) : null;
     const to = state.to ? new Date(state.to) : null;
     const freq = {};
@@ -247,7 +251,7 @@
     for (const it of items) {
       const key = keyOf(it);
       let ok = true;
-      if (terms.length && !terms.some(t => it.text.includes(t))) ok = false;
+      if (terms.length && !terms.some(({ t, digits }) => it.text.includes(t) || (digits && String(it.phone).replace(/\D/g, "").includes(digits)))) ok = false;
       if (from && it.date < from) ok = false;
       if (to && it.date > to) ok = false;
       if (state.onlyDup && !(freq[key] > 1)) ok = false;
