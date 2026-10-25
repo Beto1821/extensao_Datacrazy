@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Datacrazy – Filtro de Logs do Bloco",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Adiciona uma barra de filtro (nome, telefone, período, duplicados) na aba Logs do bloco do CRM Datacrazy.",
   "icons": {
     "16": "icons/icon16.png",

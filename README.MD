@@ -2,7 +2,7 @@
 
 Extensão para Google Chrome que adiciona uma barra de filtro na aba **Logs** do bloco do CRM Datacrazy (`https://crm.datacrazy.io`). Com ela você filtra os logs por nome, telefone, status e período, encontra contatos repetidos e baixa o resultado em planilha (CSV).
 
-Versão atual: **1.7.0**
+Versão atual: **1.7.1**
 
 Desenvolvido por **Adalberto Ribeiro** – Time Tigers Datacrazy.
 

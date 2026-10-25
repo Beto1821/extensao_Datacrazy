@@ -690,8 +690,8 @@
     return bar;
   }
 
-  // campo de data com "folhinha de mesa": mostra mês/dia escolhidos (vazio = hoje) e abre o seletor.
-  // Sem id: há uma barra por aba, então o botão acha o input pelo próprio campo.
+  // campo de data com "folhinha de mesa": mostra mês/dia escolhidos (vazio = hoje).
+  // Quem abre o seletor é o hook.js: showPicker() falha calado no mundo isolado da extensão.
   const MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
   const dateField = (k, title, label) => `
     <div class="dcf-date">
@@ -705,16 +705,13 @@
 
   function initFolhinhas(root) {
     root.querySelectorAll(".dcf-date").forEach(field => {
-      const input = field.querySelector("input"), btn = field.querySelector(".dcf-date-pill");
-      const mes = btn.querySelector(".dcf-desk-cal-mes"), dia = btn.querySelector(".dcf-desk-cal-dia");
+      const input = field.querySelector("input");
+      const mes = field.querySelector(".dcf-desk-cal-mes"), dia = field.querySelector(".dcf-desk-cal-dia");
       const atualizar = () => {
         const d = input.value ? new Date(input.value) : new Date();
         mes.textContent = MESES[d.getMonth()];
         dia.textContent = d.getDate();
       };
-      const abrir = () => { try { input.showPicker(); } catch { input.focus(); } };
-      btn.addEventListener("click", abrir);
-      input.addEventListener("click", abrir);
       input.addEventListener("change", atualizar);
       input.addEventListener("input", atualizar);
       atualizar();

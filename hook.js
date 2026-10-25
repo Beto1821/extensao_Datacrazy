@@ -14,6 +14,15 @@
     if (e.data.type === "load-session") loadSession(e.data.id);
   });
 
+  // campos de data da barra (botão "Escolher" ou o próprio campo): abre o calendário daqui,
+  // porque no mundo isolado do content.js o showPicker() não abre nada
+  document.addEventListener("click", e => {
+    const field = e.target.closest?.(".dcf-date");
+    const input = field?.querySelector('input[type="datetime-local"]');
+    if (!input) return;
+    try { input.showPicker(); } catch { input.focus(); }
+  }, true);
+
   // clique num log da lista Crazy: mesma ação do card do Clássico (mostra o caminho da sessão
   // em cima dos blocos). A função vem do contexto React do editor de flow.
   function loadSession(id) {
