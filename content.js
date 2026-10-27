@@ -370,6 +370,64 @@
     list.classList.add("dcf-native-off");
     api.set(list, { ...data, view });
     apply(list);
+    enrich(list);
+  }
+
+  // ---------- nome/telefone pela sessão ----------
+  // blocos antes do "Criar lead" (ex.: início por webhook) vêm no log sem lead e sem contato;
+  // nome e telefone estão nos parâmetros/datasources da sessão (um pedido por sessão, com cache)
+  const SESSION_PARALLEL = 6;
+  const people = new Map(); // sessionId -> Promise<{ name, phone }>
+
+  function sessionDetails(id) {
+    if (!lastReq) return Promise.reject(new Error("rota de logs ainda não capturada"));
+    const headers = { ...lastReq.headers };
+    delete headers["x-dz-include-totals"];
+    return getJson(`${new URL(lastReq.url).origin}/api/crm/flow-sessions/${encodeURIComponent(id)}/details`, headers);
+  }
+
+  function personOf(d) {
+    const p = d?.parameters || {};
+    const digits = v => String(v || "").replace(/\D/g, "");
+    let name = String(p.leadName || "").trim(), phone = digits(p.leadPhone);
+    // corpo do webhook (Api-request-N) e análise de telefone (phone-N)
+    for (const v of Object.values(d?.datasources || {})) {
+      const o = unwrap(v);
+      if (!o || typeof o !== "object") continue;
+      name ||= String(o.name || o.nome || "").trim();
+      phone ||= digits(o.phone || o.telefone || o.whatsapp || o.celular);
+    }
+    return { name, phone };
+  }
+
+  function fetchPerson(id) {
+    if (!people.has(id))
+      people.set(id, sessionDetails(id).then(personOf, err => {
+        people.delete(id); // falhou: tenta de novo na próxima carga
+        console.warn(`[Filtro de Logs] sessão ${id}:`, err.message);
+        return { name: "", phone: "" };
+      }));
+    return people.get(id);
+  }
+
+  async function enrich(list) {
+    const a = api.get(list);
+    const todo = a.items.filter(it => it.sessionId && (!it.phone || !(it.lead || it.contact)));
+    let i = 0, timer;
+    const redraw = () => { clearTimeout(timer); timer = setTimeout(() => api.get(list) === a && apply(list), 250); };
+    const worker = async () => {
+      while (i < todo.length && api.get(list) === a) {
+        const it = todo[i++];
+        const { name, phone } = await fetchPerson(it.sessionId);
+        const add = [];
+        if (name && !it.lead && !it.contact) add.push((it.lead = name));
+        if (phone && !it.phone) add.push((it.phone = phone));
+        if (!add.length) continue;
+        it.text += ` ${add.join(" ")}`.toLowerCase();
+        redraw();
+      }
+    };
+    await Promise.all(Array.from({ length: SESSION_PARALLEL }, worker));
   }
 
   function exitApi(list) {
@@ -466,10 +524,7 @@
 
     let data;
     try {
-      if (!lastReq) throw new Error("rota de logs ainda não capturada");
-      const headers = { ...lastReq.headers };
-      delete headers["x-dz-include-totals"];
-      data = await getJson(`${new URL(lastReq.url).origin}/api/crm/flow-sessions/${encodeURIComponent(id)}/details`, headers);
+      data = await sessionDetails(id);
     } catch (err) {
       content.innerHTML = `<div class="dcf-empty">Não foi possível buscar a sessão: ${escHtml(err.message)}</div>`;
       return;

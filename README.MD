@@ -2,7 +2,7 @@
 
 Extensão para Google Chrome que adiciona uma barra de filtro na aba **Logs** do bloco do CRM Datacrazy (`https://crm.datacrazy.io`). Com ela você filtra os logs por nome, telefone, status e período, encontra contatos repetidos e baixa o resultado em planilha (CSV).
 
-Versão atual: **1.7.2**
+Versão atual: **1.8.0**
 
 Desenvolvido por **Adalberto Ribeiro** – Time Tigers Datacrazy.
 
@@ -105,6 +105,7 @@ Outros detalhes:
 - O contador **"Mostrando X de Y"** indica quantos logs passaram no filtro.
 - O filtro continua valendo ao trocar entre as abas Entraram, Sucessos, Alertas e Erros.
 - **Clique num log** da lista: o Datacrazy desenha o caminho daquela sessão em cima dos blocos (ordem e horário em que entrou em cada um), igual ao card do modo Clássico. Clique de novo no mesmo log para apagar.
+- **Nome e telefone em todos os blocos**: blocos antes do "Criar lead" (por exemplo, o Início com webhook) não trazem lead nem contato no log, e o bloco "Criar lead" traz o nome sem o telefone. Nesses logs a extensão busca os dados da sessão e mostra o nome e o telefone que chegaram no webhook. Os nomes aparecem aos poucos, logo depois da lista carregar. A busca, os filtros e o CSV também usam esses dados.
 - **Ícone de banco de dados** no log: abre a inspeção da sessão, com os metadados, os parâmetros, os datasources e o histórico de blocos (nome, horário e tempo em cada bloco). Mostra em árvore ou JSON puro (**Raw**), e o botão **Copiar JSON** copia a seção aberta.
 
 ### Sobre o arquivo CSV
@@ -119,6 +120,8 @@ Outros detalhes:
 Quando você clica num bloco, o Datacrazy chama a rota de logs (`/api/crm/flows/.../logs?take=30&skip=0...`). A extensão observa essa chamada (arquivo `hook.js`) e reaproveita a mesma rota, com o seu login, para buscar todas as páginas de uma vez. Nenhum dado sai do seu navegador.
 
 Se a rota falhar (por exemplo, sessão expirada), a extensão volta ao modo antigo: rola a lista da página até o fim, o que é mais lento. Ao trocar de bloco ou de aba no Datacrazy, a lista volta a ser a original da página. Recargas da mesma aba (por exemplo, o seletor "Última semana") não apagam a lista carregada.
+
+Para os logs sem nome ou telefone, a extensão também chama `/api/crm/flow-sessions/<sessão>/details` (6 ao mesmo tempo, uma vez por sessão) e usa `parameters.leadName`/`leadPhone` ou o nome e telefone do datasource do webhook.
 
 Se uma página demorar mais de 30 segundos, a extensão tenta de novo (até 3 vezes). Se mesmo assim falhar no meio, mostra o que já veio com o aviso **"incompleto"** no contador.
 
@@ -150,6 +153,7 @@ Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois,
 | "Mostrando 0 de N" com período preenchido | O período está fora dos últimos 7 dias, que é o que o Datacrazy guarda. Veja o aviso amarelo na barra. |
 | Contador mostra "incompleto" | Uma página do Datacrazy não respondeu. Clique em **Carregar tudo** de novo. |
 | **Carregar tudo** ficou lento (rolando a lista) | A busca direta falhou. Clique no bloco de novo (para o Datacrazy refazer a chamada) e tente outra vez. Se continuar, recarregue a página (F5). |
+| Log aparece como "(sem lead)" ou sem telefone | Os nomes e telefones da sessão chegam aos poucos depois da lista carregar: espere alguns segundos. Se continuar, o webhook daquela sessão chegou sem nome e sem telefone (abra o ícone de banco de dados e veja **Datasources**). Precisa da versão 1.8.0 ou mais nova. |
 | O calendário de **De:** / **Até:** não abre | Versão 1.7.0 tinha esse erro. Atualize para a 1.7.1 ou mais nova (veja [Atualizar](#atualizar-para-uma-nova-versão)) e clique em recarregar no card da extensão. |
 | O Chrome bloqueia o download | Permita downloads para `crm.datacrazy.io` nas configurações do Chrome. |
 | Aviso "Desativar extensões no modo desenvolvedor" ao abrir o Chrome | É normal para extensões instaladas por pasta. Feche o aviso (não clique em desativar). |
@@ -161,7 +165,7 @@ Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois,
 | Arquivo | Conteúdo |
 | ------- | -------- |
 | `manifest.json` | Configuração da extensão (nome, versão, site onde roda) |
-| `content.js` | Código que cria a barra, busca os logs, aplica os filtros, gera o CSV e abre a inspeção da sessão |
+| `content.js` | Código que cria a barra, busca os logs, completa nome e telefone pela sessão, aplica os filtros, gera o CSV e abre a inspeção da sessão |
 | `hook.js` | Observa a chamada do Datacrazy à rota de logs, para a extensão reaproveitá-la, desenha o caminho da sessão nos blocos ao clicar num log e abre o calendário dos campos de data (roda no mundo da página, onde o `showPicker()` do Chrome funciona) |
 | `styles.css` | Estilo da barra, da lista, dos campos de data e do modal de inspeção |
 | `icons/` | Logo da extensão em 16, 32, 48 e 128 px (gerados a partir de `DC.png`) |
