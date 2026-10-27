@@ -1,0 +1,14 @@
+{
+  "name": "teste-filtro-logs-datacrazy",
+  "private": true,
+  "description": "Testes da extensão Datacrazy – Filtro de Logs do Bloco",
+  "scripts": {
+    "test": "npm run unit && npm run mock",
+    "unit": "node --test \"unit/*.test.js\"",
+    "mock": "node --test --test-concurrency=1 \"mock/*.test.js\"",
+    "real": "node real/smoke.js"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1"
+  }
+}

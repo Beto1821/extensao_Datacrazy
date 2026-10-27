@@ -1,5 +1,5 @@
 ==============================================================
-  DATACRAZY - FILTRO DE LOGS DO BLOCO  (versão 1.8.0)
+  DATACRAZY - FILTRO DE LOGS DO BLOCO  (versão 1.8.1)
   Como instalar a extensão no Google Chrome
 
   © 2026 Adalberto Ribeiro - Time Tigers Datacrazy
@@ -27,6 +27,7 @@ pasta extraída.
         - pasta "extensao-datacrazy" (a extensão)
   4. Dentro da pasta "extensao-datacrazy" devem estar:
         - manifest.json
+        - lib.js
         - content.js
         - hook.js
         - styles.css

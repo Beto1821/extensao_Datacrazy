@@ -36,12 +36,26 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # versão quebrada não vira release: roda os mesmos testes do testes.yml antes do zip
+      - uses: actions/setup-node@v4
+        if: steps.exists.outputs.found == 'false'
+        with:
+          node-version: 22
+
+      - name: Testes
+        if: steps.exists.outputs.found == 'false'
+        working-directory: teste
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npm test
+
       - name: Montar o zip da extensão
         if: steps.exists.outputs.found == 'false'
         run: |
           # LEIA-ME fora (visível ao extrair) e dentro da pasta da extensão
           mkdir -p dist/pkg/extensao-datacrazy
-          cp -r LEIA-ME.txt manifest.json hook.js content.js styles.css icons dist/pkg/extensao-datacrazy/
+          cp -r LEIA-ME.txt manifest.json hook.js lib.js content.js styles.css icons dist/pkg/extensao-datacrazy/
           cp LEIA-ME.txt dist/pkg/
           cd dist/pkg && zip -r -X ../datacrazy-filtro-logs.zip LEIA-ME.txt extensao-datacrazy && cd ..
           unzip -l datacrazy-filtro-logs.zip

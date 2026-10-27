@@ -1,0 +1,19 @@
+{
+  "id": "s-webhook",
+  "flowBlockId": "bloco-acao",
+  "contactId": "",
+  "finished": true,
+  "parameters": {
+    "leadId": "lead-1",
+    "leadName": "Maria Teste",
+    "leadEmail": "maria@exemplo.com",
+    "leadPhone": "5511987654321",
+    "leadSource": "Meta Ads"
+  },
+  "datasources": {
+    "phone-1": { "ddi": "55", "phone": "5511987654321", "nationalNumber": "(11) 98765-4321" },
+    "Api-request-1": { "ddi": "+55", "name": "Maria Teste", "email": "maria@exemplo.com", "phone": "5511987654321", "origem": "Meta Ads" },
+    "Api-request-2": { "message": "Workflow was started" }
+  },
+  "history": []
+}

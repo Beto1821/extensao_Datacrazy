@@ -1,0 +1,9 @@
+{
+  "id": "s-so-webhook",
+  "flowBlockId": "bloco-inicio",
+  "parameters": {},
+  "datasources": {
+    "Api-request-1": "{\"nome\":\"João Exemplo\",\"telefone\":\"(21) 99876-5432\"}"
+  },
+  "history": []
+}

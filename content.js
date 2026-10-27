@@ -4,11 +4,7 @@
 // se a API falhar, caem para o modo antigo (rolar a lista até o fim).
 
 (() => {
-  const DATE_RE = /^(\d{1,2}) de (\w+) de (\d{4}) (\d{2}):(\d{2})/i;
-  const MONTHS = { janeiro:0, fevereiro:1, "março":2, marco:2, abril:3, maio:4, junho:5,
-                   julho:6, agosto:7, setembro:8, outubro:9, novembro:10, dezembro:11 };
-  const TYPE_LABEL = { entered: "Entrou", succeeded: "Concluído com sucesso", warning: "Alerta",
-                       alert: "Alerta", error: "Erro", failed: "Erro" };
+  const { DATE_RE, pad, fmtDate, escHtml, reqKey, parseLines, fromApi, fmtPhone, hue, dayLabel, unwrap, personOf } = dcfLib;
   const PAGE_SIZE = 200;
   const REQUEST_TIMEOUT = 30000;
   const MAX_RENDER = 3000; // acima disso a lista na tela é cortada (o CSV leva tudo)
@@ -44,11 +40,6 @@
   });
   window.postMessage({ source: "dcf-content", type: "get-last" }, location.origin);
 
-  function reqKey(url) {
-    const s = new URL(url).searchParams;
-    return `${s.get("filter[flowBlockId]")}|${s.get("filter[type]")}`;
-  }
-
   const retentionStart = () => new Date(Date.now() - RETENTION_DAYS * 864e5);
 
   // ---------- leitura dos cards ----------
@@ -60,29 +51,14 @@
     const hit = parsed.get(card);
     if (hit && hit.sig === sig) return hit.data;
     if (card.dataset.dcfHidden === "1") return null;
-    const data = parseLines(card);
+    const data = parseLinesOf(card);
     parsed.set(card, { sig, data });
     return data;
   }
 
-  function parseLines(card) {
-    const lines = card.innerText.split("\n").map(s => s.trim()).filter(Boolean);
-    const m = (lines[0] || "").match(DATE_RE);
-    if (!m) return null;
-    const date = new Date(+m[3], MONTHS[m[2].toLowerCase()] ?? 0, +m[1], +m[4], +m[5]);
-    const after = label => {
-      const i = lines.indexOf(label);
-      if (i < 0) return "";
-      let v = lines[i + 1] || "";
-      if (v.length === 1 && lines[i + 2]) v = lines[i + 2]; // pula a letra do avatar
-      return v;
-    };
-    const phone = [...lines].reverse().find(l => /^\+?\d{8,}$/.test(l)) || "";
-    return {
-      card, date, dateText: lines[0], status: lines[1] || "",
-      lead: after("Lead:"), contact: after("Contato:"), phone,
-      text: lines.join(" ").toLowerCase()
-    };
+  function parseLinesOf(card) {
+    const data = parseLines(card.innerText.split("\n").map(s => s.trim()).filter(Boolean));
+    return data && { card, ...data };
   }
 
   function findCards(root = document) {
@@ -93,22 +69,6 @@
   }
 
   // ---------- leitura da API ----------
-  const pad = n => String(n).padStart(2, "0");
-  const fmtDate = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-
-  function fromApi(r) {
-    const date = new Date(r.createdAt);
-    const status = [TYPE_LABEL[r.type] || r.type || r.message || "", r.errorCode].filter(Boolean).join(" – ");
-    const lead = r.lead?.name?.trim() || "";
-    const contact = (r.contactName || "").trim();
-    const phone = r.contactId || "";
-    return {
-      id: `${r.flowSessionId}|${r.createdAt}`, sessionId: r.flowSessionId || "", date, dateText: fmtDate(date), status, lead, contact, phone,
-      type: r.type, errorCode: r.errorCode || "",
-      text: [fmtDate(date), status, lead, contact, phone, r.message].join(" ").toLowerCase()
-    };
-  }
-
   // x-signature da aplicação: AES-256-CBC(horário do servidor, SHA-256(chave pública da página))
   let sigKey, timeOffset;
   async function freshSignature() {
@@ -234,33 +194,7 @@
   }
 
   // ---------- filtro ----------
-  function filterItems(items) {
-    const terms = state.q.toLowerCase().split(",").map(s => s.trim()).filter(Boolean).map(t => ({
-      t,
-      // telefone colado do card ("+55 (47) 93618-3266"): compara só os dígitos
-      digits: /^[\d\s()+\-.]+$/.test(t) && t.replace(/\D/g, "").length >= 4 ? t.replace(/\D/g, "") : ""
-    }));
-    const from = state.from ? new Date(state.from) : null;
-    const to = state.to ? new Date(state.to) : null;
-    const freq = {};
-    // repetido = mesmo telefone; sem telefone (ex.: só Lead), usa o nome
-    // log sem telefone, lead e contato (ex.: execução agendada) nunca conta como repetido
-    const keyOf = it => it.phone || it.lead || it.contact || "";
-    items.forEach(it => { const k = keyOf(it); if (k) freq[k] = (freq[k] || 0) + 1; });
-    const seen = new Set();
-    for (const it of items) {
-      const key = keyOf(it);
-      let ok = true;
-      if (terms.length && !terms.some(({ t, digits }) => it.text.includes(t) || (digits && String(it.phone).replace(/\D/g, "").includes(digits)))) ok = false;
-      if (from && it.date < from) ok = false;
-      if (to && it.date > to) ok = false;
-      if (state.onlyDup && !(freq[key] > 1)) ok = false;
-      if (ok && state.unique && key) { if (seen.has(key)) ok = false; else seen.add(key); }
-      it.visible = ok;
-      it.count = freq[key] || 1;
-    }
-    return items;
-  }
+  const filterItems = items => dcfLib.filterItems(items, state);
 
   function setCount(list, shown, total, extra = "") {
     const bar = bars.get(list);
@@ -286,33 +220,9 @@
   }
 
   // ---------- lista própria (dados da API) ----------
-  const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-
   // tipo do log -> classe de cor + rótulo curto
   const KIND = { succeeded: ["ok", "✓ Sucesso"], entered: ["in", "→ Entrou"], warning: ["warn", "! Alerta"],
                  alert: ["warn", "! Alerta"], error: ["err", "✕ Erro"], failed: ["err", "✕ Erro"] };
-  const WEEKDAY = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-
-  function fmtPhone(p) {
-    const d = String(p).replace(/\D/g, "");
-    const m = d.match(/^55(\d{2})(\d{4,5})(\d{4})$/);
-    return m ? `+55 (${m[1]}) ${m[2]}-${m[3]}` : d ? `+${d}` : "";
-  }
-
-  // cor fixa por nome (mesmo lead = mesma cor)
-  function hue(s) {
-    let h = 0;
-    for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360;
-    return h;
-  }
-
-  function dayLabel(d) {
-    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const diff = Math.round((today - day) / 864e5);
-    const dm = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
-    return diff === 0 ? `Hoje · ${dm}` : diff === 1 ? `Ontem · ${dm}` : `${WEEKDAY[d.getDay()]}, ${dm}`;
-  }
 
   function itemHtml(it) {
     const [kind, label] = KIND[it.type] || ["neutral", it.status || "—"];
@@ -386,20 +296,6 @@
     return getJson(`${new URL(lastReq.url).origin}/api/crm/flow-sessions/${encodeURIComponent(id)}/details`, headers);
   }
 
-  function personOf(d) {
-    const p = d?.parameters || {};
-    const digits = v => String(v || "").replace(/\D/g, "");
-    let name = String(p.leadName || "").trim(), phone = digits(p.leadPhone);
-    // corpo do webhook (Api-request-N) e análise de telefone (phone-N)
-    for (const v of Object.values(d?.datasources || {})) {
-      const o = unwrap(v);
-      if (!o || typeof o !== "object") continue;
-      name ||= String(o.name || o.nome || "").trim();
-      phone ||= digits(o.phone || o.telefone || o.whatsapp || o.celular);
-    }
-    return { name, phone };
-  }
-
   function fetchPerson(id) {
     if (!people.has(id))
       people.set(id, sessionDetails(id).then(personOf, err => {
@@ -414,6 +310,7 @@
     const a = api.get(list);
     const todo = a.items.filter(it => it.sessionId && (!it.phone || !(it.lead || it.contact)));
     let i = 0, timer;
+    if (todo.length) a.view.dataset.dcfSessions = "loading"; // sinal para o teste real (teste/real)
     const redraw = () => { clearTimeout(timer); timer = setTimeout(() => api.get(list) === a && apply(list), 250); };
     const worker = async () => {
       while (i < todo.length && api.get(list) === a) {
@@ -428,6 +325,7 @@
       }
     };
     await Promise.all(Array.from({ length: SESSION_PARALLEL }, worker));
+    delete a.view.dataset.dcfSessions;
   }
 
   function exitApi(list) {
@@ -454,12 +352,6 @@
   function blockName(id) {
     const node = document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
     return node?.querySelector("span.text-base.font-semibold")?.textContent.trim() || id;
-  }
-
-  // texto que é JSON (ex.: corpo de webhook) vira objeto, para abrir na árvore
-  function unwrap(v) {
-    if (typeof v !== "string" || !/^\s*[{[]/.test(v)) return v;
-    try { return JSON.parse(v); } catch { return v; }
   }
 
   function treeHtml(v, key, depth = 0) {

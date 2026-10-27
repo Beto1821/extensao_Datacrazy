@@ -1,0 +1,7 @@
+{
+  "id": "s-vazia",
+  "flowBlockId": "bloco-acao",
+  "parameters": { "leadName": "", "lastErrorCode": "lead-name-required", "lastErrorMessage": "Lead name is required" },
+  "datasources": { "Api-request-1": { "ddi": "+55", "name": "", "phone": "", "email": "" } },
+  "history": []
+}

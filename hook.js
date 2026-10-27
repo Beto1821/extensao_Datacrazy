@@ -41,7 +41,8 @@
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input?.url;
       if (url && LOGS_RE.test(url)) {
         const h = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
-        const req = { url, headers: Object.fromEntries(h.entries()) };
+        // URL absoluta: o content.js monta outras rotas a partir dela
+        const req = { url: new URL(url, location.href).href, headers: Object.fromEntries(h.entries()) };
         // só guarda chamadas que deram certo: ao trocar de aba a aplicação cancela a anterior
         p.then(res => { if (res.ok) { last = req; send(); } }, () => {});
       }

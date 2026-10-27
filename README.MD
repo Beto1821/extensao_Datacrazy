@@ -2,7 +2,7 @@
 
 Extensão para Google Chrome que adiciona uma barra de filtro na aba **Logs** do bloco do CRM Datacrazy (`https://crm.datacrazy.io`). Com ela você filtra os logs por nome, telefone, status e período, encontra contatos repetidos e baixa o resultado em planilha (CSV).
 
-Versão atual: **1.8.0**
+Versão atual: **1.8.1**
 
 Desenvolvido por **Adalberto Ribeiro** – Time Tigers Datacrazy.
 
@@ -32,6 +32,7 @@ Ou abra a [última versão](https://github.com/Beto1821/extensao_Datacrazy/relea
    - pasta **`extensao-datacrazy`**: a extensão.
 5. Dentro da pasta `extensao-datacrazy` devem estar estes itens:
    - `manifest.json`
+   - `lib.js`
    - `content.js`
    - `hook.js`
    - `styles.css`
@@ -146,13 +147,14 @@ Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois,
 | -------- | ------- |
 | Não aparece o botão **Carregar sem compactação** | Ative o **Modo do desenvolvedor** (passo 5). |
 | Erro "Manifest file is missing or unreadable" | A pasta selecionada não é a que contém o `manifest.json`. Comum quando o zip cria uma pasta dentro de outra: entre até a pasta que tem o `manifest.json`. |
-| Erro "Manifest is not valid JSON" ou "Could not load javascript 'content.js'" | Algum arquivo está faltando ou com nome trocado (por exemplo, `manifest (2).json`). Baixe e extraia o zip de novo. |
+| Erro "Manifest is not valid JSON" ou "Could not load javascript 'content.js'" (ou 'lib.js') | Algum arquivo está faltando ou com nome trocado (por exemplo, `manifest (2).json`). Baixe e extraia o zip de novo. |
 | Erro "Could not load icon" | Falta a pasta `icons` dentro da pasta da extensão. Baixe e extraia o zip de novo. |
 | A barra não aparece | Confirme que a extensão está ligada, que o endereço é `crm.datacrazy.io` e recarregue a página (F5). |
 | Faltam logs na tela | Clique em **Carregar tudo** antes de filtrar. O **Baixar CSV** já carrega tudo sozinho. |
 | "Mostrando 0 de N" com período preenchido | O período está fora dos últimos 7 dias, que é o que o Datacrazy guarda. Veja o aviso amarelo na barra. |
 | Contador mostra "incompleto" | Uma página do Datacrazy não respondeu. Clique em **Carregar tudo** de novo. |
 | **Carregar tudo** ficou lento (rolando a lista) | A busca direta falhou. Clique no bloco de novo (para o Datacrazy refazer a chamada) e tente outra vez. Se continuar, recarregue a página (F5). |
+| Logs de março não aparecem quando a extensão rola a lista (busca direta falhou) | A versão 1.8.0 e as anteriores não reconheciam a data com "ç". Atualize para a 1.8.1 ou mais nova. |
 | Log aparece como "(sem lead)" ou sem telefone | Os nomes e telefones da sessão chegam aos poucos depois da lista carregar: espere alguns segundos. Se continuar, o webhook daquela sessão chegou sem nome e sem telefone (abra o ícone de banco de dados e veja **Datasources**). Precisa da versão 1.8.0 ou mais nova. |
 | O calendário de **De:** / **Até:** não abre | Versão 1.7.0 tinha esse erro. Atualize para a 1.7.1 ou mais nova (veja [Atualizar](#atualizar-para-uma-nova-versão)) e clique em recarregar no card da extensão. |
 | O Chrome bloqueia o download | Permita downloads para `crm.datacrazy.io` nas configurações do Chrome. |
@@ -165,20 +167,47 @@ Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois,
 | Arquivo | Conteúdo |
 | ------- | -------- |
 | `manifest.json` | Configuração da extensão (nome, versão, site onde roda) |
+| `lib.js` | Funções sem tela e sem rede usadas pelo `content.js`: leitura dos logs e dos cards, filtro, formatação de telefone e data, nome e telefone da sessão. Os testes de unidade testam este arquivo |
 | `content.js` | Código que cria a barra, busca os logs, completa nome e telefone pela sessão, aplica os filtros, gera o CSV e abre a inspeção da sessão |
 | `hook.js` | Observa a chamada do Datacrazy à rota de logs, para a extensão reaproveitá-la, desenha o caminho da sessão nos blocos ao clicar num log e abre o calendário dos campos de data (roda no mundo da página, onde o `showPicker()` do Chrome funciona) |
 | `styles.css` | Estilo da barra, da lista, dos campos de data e do modal de inspeção |
 | `icons/` | Logo da extensão em 16, 32, 48 e 128 px (gerados a partir de `DC.png`) |
 | `DC.png` | Logo original em alta resolução (não vai no zip) |
 | `LEIA-ME.txt` | Instruções de instalação que vão no zip, na raiz e dentro da pasta da extensão (abre no Bloco de Notas) |
-| `datacrazy-filtro-logs.zip` | Pacote para distribuir: `LEIA-ME.txt` + pasta `extensao-datacrazy` com os arquivos acima (menos `DC.png`) |
+| `datacrazy-filtro-logs.zip` | Pacote para distribuir: `LEIA-ME.txt` + pasta `extensao-datacrazy` com os arquivos acima (menos `DC.png` e `teste/`) |
+| `teste/` | Testes automáticos (veja [Testes](#testes)). Não vai no zip |
 
 ### Publicar uma versão nova
 
 1. Altere o código e aumente a versão no `manifest.json` (e no `LEIA-ME.txt` e no topo deste README).
 2. Faça commit e push para a branch `main`.
 
-A GitHub Action [`release.yml`](.github/workflows/release.yml) percebe a versão nova, monta o zip e cria a release sozinha, com dois arquivos iguais: `datacrazy-filtro-logs-vX.Y.Z.zip` (versão no nome) e `datacrazy-filtro-logs.zip` (nome fixo). O link `/releases/latest/download/datacrazy-filtro-logs.zip` passa a entregar a versão nova na hora; por isso o arquivo de nome fixo não pode ser renomeado. Se a versão já tiver release, a Action não faz nada.
+A GitHub Action [`release.yml`](.github/workflows/release.yml) percebe a versão nova, roda os testes (se algum falhar, não sai release), monta o zip e cria a release sozinha, com dois arquivos iguais: `datacrazy-filtro-logs-vX.Y.Z.zip` (versão no nome) e `datacrazy-filtro-logs.zip` (nome fixo). O link `/releases/latest/download/datacrazy-filtro-logs.zip` passa a entregar a versão nova na hora; por isso o arquivo de nome fixo não pode ser renomeado. Se a versão já tiver release, a Action não faz nada.
+
+### Testes
+
+Os testes ficam na pasta `teste/` e precisam do Node.js 22 ou mais novo. Na primeira vez, instale:
+
+```bash
+cd teste
+npm install
+npx playwright install chromium
+```
+
+| Comando | O que testa | Precisa de login? |
+| ------- | ----------- | ----------------- |
+| `npm run unit` | Funções do `lib.js`: leitura dos logs e dos cards (inclusive datas de março), filtro (vírgula, telefone com máscara, período, únicos, repetidos), telefone formatado, nome e telefone da sessão. Também confere o pacote: arquivos do `manifest.json`, arquivos que a release coloca no zip e versão igual no README e no LEIA-ME. Leva menos de 1 segundo. | Não |
+| `npm run mock` | A extensão inteira num **CRM falso** (`teste/mock/crm-falso.js`), sem internet: nome e telefone pela sessão, no máximo 6 sessões ao mesmo tempo e cache entre abas, paginação de 93 em 93, erro 500 na sessão e na página de logs (aviso "incompleto"), assinatura velha (401), busca e CSV, Clássico/Crazy e nome com HTML. Leva uns 30 segundos. | Não |
+| `npm test` | `unit` + `mock`. É o que o GitHub roda a cada push ([`testes.yml`](.github/workflows/testes.yml)) e antes de cada release. | Não |
+| `npm run real -- <link do flow>` | Abre o Chromium com a extensão no **Datacrazy de verdade**, passa por todos os blocos e abas do flow e mostra um relatório. Por bloco e aba, mostra quantos logs o Datacrazy diz ter, quantos a extensão mostra, quantos ficaram sem nome ou sem telefone, o tempo e os problemas encontrados. | Sim |
+
+Sobre o `npm run real`:
+
+- Exemplo: `npm run real -- https://crm.datacrazy.io/flow/e747f993-8056-4e4e-b3b1-fd2ec861a7e5`.
+- Na primeira vez, faça login na janela que abrir. O teste espera até 10 minutos. O login fica salvo em `~/.cache/dcf-teste-perfil`, fora do OneDrive e do git (outra pasta: variável `DCF_PERFIL`).
+- O relatório completo vai para `teste/relatorios/` (fora do git, porque tem ids de sessão). Ele lista até 5 sessões sem nome por aba. Abra essas sessões no ícone de banco de dados para ver por que vieram vazias. Em geral, o webhook chegou sem nome e sem telefone.
+- Termina com código 1 se achar problema: a extensão mostra um total diferente do Datacrazy, a lista travou, a carga ficou "incompleto" ou deu erro de JavaScript da extensão. Erros do próprio Datacrazy aparecem no relatório, mas não contam como problema.
+- Rode depois de mudar o código ou quando o Datacrazy lançar novidade: é o único teste que percebe se o Datacrazy mudou a rota ou o nome de um campo.
 
 ---
 
