@@ -167,3 +167,18 @@ test("fromApi: código sem tradução continua aparecendo", () => {
   assert.equal(it.errorMsg, "");
   assert.equal(it.status, "Erro – x.errors.novo");
 });
+
+test("stuckItems: entrou sem sucesso nem erro, um card por sessão, alerta marcado", () => {
+  const e = (sid, min, over = {}) => ({ sessionId: sid, date: new Date(2026, 9, 27, 10, min), ...over });
+  const res = lib.stuckItems(
+    [e("a", 1), e("a", 5), e("b", 2), e("c", 3), e("d", 4), e("", 6)],
+    [e("b", 3)], [e("c", 4)], [e("d", 5, { errorMsg: "Alerta X", errorCode: "x.errors.y" })]);
+  assert.deepEqual(res.map(i => [i.sessionId, i.date.getMinutes(), !!i.alert]), [["a", 5, false], ["d", 4, true]]);
+  assert.equal(res[1].errorMsg, "Alerta X");
+});
+
+test("stillIn: sessão sem horário de saída do bloco", () => {
+  assert.equal(lib.stillIn({ history: [{ flowBlockId: "b1", exitedDate: null }] }, "b1"), true);
+  assert.equal(lib.stillIn({ history: [{ flowBlockId: "b1", exitedDate: "2026-10-27" }] }, "b1"), false);
+  assert.equal(lib.stillIn(null, "b1"), false);
+});

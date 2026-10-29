@@ -41,6 +41,8 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CRM falso<
     <b data-t="succeeded">Sucessos</b><b data-t="warning">Alertas</b><b data-t="error">Erros</b></div>
   <div class="react-flow__node" data-id="bloco-acao"><span class="text-base font-semibold">Ação</span><br>
     <b data-t="succeeded">Sucessos</b><b data-t="warning">Alertas</b><b data-t="error">Erros</b></div>
+  <div class="react-flow__node" data-id="bloco-espera"><span class="text-base font-semibold">Espera</span><br>
+    <b data-t="succeeded">Sucessos</b><b data-t="warning">Alertas</b><b data-t="error">Erros</b></div>
 </div>
 <div id="sheet" hidden>
   <div>Logs do bloco</div>

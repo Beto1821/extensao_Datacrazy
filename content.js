@@ -4,7 +4,7 @@
 // se a API falhar, caem para o modo antigo (rolar a lista até o fim).
 
 (() => {
-  const { DATE_RE, pad, fmtDate, escHtml, reqKey, parseLines, fromApi, fmtPhone, hue, dayLabel, unwrap, personOf } = dcfLib;
+  const { DATE_RE, pad, fmtDate, escHtml, reqKey, parseLines, fromApi, stuckItems, stillIn, fmtPhone, hue, dayLabel, unwrap, personOf } = dcfLib;
   const PAGE_SIZE = 200;
   const REQUEST_TIMEOUT = 30000;
   const MAX_RENDER = 3000; // acima disso a lista na tela é cortada (o CSV leva tudo)
@@ -26,6 +26,7 @@
   let selSession = null;     // sessão cujo caminho está desenhado sobre os blocos
   let errorTexts = {};       // código de erro -> frase traduzida do CRM (vem do hook.js)
   const reproc = new Map();  // "sessão|bloco" -> { st: "busy" | "ok" | "fail", msg } do botão reprocessar
+  const picked = new Set();  // "sessão|bloco" marcados na caixinha, para reprocessar em lote
 
   // ---------- captura da rota (mensagens do hook.js) ----------
   window.addEventListener("message", e => {
@@ -136,10 +137,12 @@
 
   // busca todas as páginas da mesma rota que a aplicação usa, com páginas maiores e em paralelo
   // onProgress(carregados, total|null); cancelled() = usuário clicou em Cancelar
-  async function fetchAllLogs(onProgress, cancelled) {
+  // type: outra aba do mesmo bloco (ex.: "entered"); sem type, a aba aberta
+  async function fetchAllLogs(onProgress, cancelled, type) {
     if (!lastReq) throw new Error("rota de logs ainda não capturada");
     const base = new URL(lastReq.url);
     base.searchParams.set("take", PAGE_SIZE);
+    if (type) base.searchParams.set("filter[type]", type);
     if (state.from) base.searchParams.set("filter[createdAtGreaterOrEqual]", new Date(state.from).toISOString());
     if (state.to) base.searchParams.set("filter[createdAtLessOrEqual]", new Date(state.to).toISOString());
     const headers = { ...lastReq.headers };
@@ -212,7 +215,7 @@
       return [];
     }
     const a = api.get(list);
-    if (a) return renderApi(list, a);
+    if (a) { const r = renderApi(list, a); updatePickBar(list); return r; }
     const items = filterItems(findCards(list).map(parseCard).filter(Boolean));
     for (const it of items) {
       it.card.dataset.dcfHidden = it.visible ? "0" : "1";
@@ -238,9 +241,13 @@
       ? `<button class="dcf-db dcf-play" title="Reprocessar a sessão a partir deste bloco"${rp?.st === "busy" ? " disabled" : ""}>${rp?.st === "busy" ? "…" : PLAY_ICON}</button>` : "";
     const rpTag = rp?.st === "ok" ? `<span class="dcf-rp dcf-rp-ok">reprocessado</span>`
       : rp?.st === "fail" ? `<span class="dcf-rp dcf-rp-fail">falhou: ${escHtml(rp.msg)}</span>` : "";
+    const chk = it.sessionId && it.blockId
+      ? `<input type="checkbox" class="dcf-chk" title="Selecionar para reprocessar"${picked.has(`${it.sessionId}|${it.blockId}`) ? " checked" : ""}>` : "";
+    const stuckTags = (it.waiting ? `<span class="dcf-rp dcf-rp-wait">em espera</span>` : "")
+      + (it.alert ? `<span class="dcf-rep">alerta</span>` : "");
     return `
       <div class="dcf-item dcf-k-${kind}${it.sessionId && it.sessionId === selSession ? " dcf-sel" : ""}" data-sid="${escHtml(it.sessionId)}" data-id="${escHtml(it.id)}">
-        <div class="dcf-av" style="--h:${hue(name)}">${escHtml((name.match(/[\p{L}\d]/u) || ["?"])[0].toUpperCase())}</div>
+        ${chk}<div class="dcf-av" style="--h:${hue(name)}">${escHtml((name.match(/[\p{L}\d]/u) || ["?"])[0].toUpperCase())}</div>
         <div class="dcf-main">
           <div class="dcf-l1"><span class="dcf-name">${escHtml(name)}</span><span class="dcf-time">${time}</span>${it.sessionId ? `<button class="dcf-db" title="Inspecionar dados da sessão">${DB_ICON}</button>` : ""}${play}</div>
           ${sub}
@@ -248,7 +255,7 @@
             ${it.phone ? `<span class="dcf-phone">${escHtml(fmtPhone(it.phone))}</span>` : ""}
             <span class="dcf-pill"${it.errorCode ? ` title="${escHtml(it.errorCode)}"` : ""}>${escHtml(label)}${it.errorCode && !it.errorMsg ? ` · ${escHtml(it.errorCode)}` : ""}</span>
             ${it.count > 1 ? `<span class="dcf-rep">repetido ${it.count}x</span>` : ""}
-            ${rpTag}
+            ${stuckTags}${rpTag}
           </div>
           ${it.errorMsg ? `<div class="dcf-msg">${escHtml(it.errorMsg)}</div>` : ""}
         </div>
@@ -272,7 +279,7 @@
       html += itemHtml(it);
     }
     a.view.innerHTML = html || `<div class="dcf-empty">Nenhum log no filtro.</div>`;
-    setCount(list, vis.length, items.length,
+    setCount(list, vis.length, items.length, (a.stuck ? " parados" : "") +
       (vis.length > MAX_RENDER ? ` (tela: ${MAX_RENDER})` : "") + (a.error ? ` – incompleto: ${a.error}` : ""));
     return items;
   }
@@ -284,13 +291,16 @@
     view.onclick = e => {
       const item = e.target.closest(".dcf-item[data-sid]");
       if (!item?.dataset.sid) return;
+      if (e.target.closest(".dcf-chk")) return void pick(list, item.dataset.id, e.target.checked);
       if (e.target.closest(".dcf-play")) return void confirmReprocess(list, item.dataset.id);
       if (e.target.closest(".dcf-db")) return void openSession(item.dataset.sid);
       selectSession(item.dataset.sid);
     };
     list.parentElement.insertBefore(view, list);
     list.classList.add("dcf-native-off");
+    picked.clear();
     api.set(list, { ...data, view });
+    updatePickBar(list);
     apply(list);
     enrich(list);
   }
@@ -300,12 +310,38 @@
   // nome e telefone estão nos parâmetros/datasources da sessão (um pedido por sessão, com cache)
   const SESSION_PARALLEL = 6;
   const people = new Map(); // sessionId -> Promise<{ name, phone }>
+  const details = new Map(); // sessionId -> Promise<detalhes|null> (aba Parados: a sessão ainda está no bloco?)
 
   function sessionDetails(id) {
     if (!lastReq) return Promise.reject(new Error("rota de logs ainda não capturada"));
     const headers = { ...lastReq.headers };
     delete headers["x-dz-include-totals"];
     return getJson(`${new URL(lastReq.url).origin}/api/crm/flow-sessions/${encodeURIComponent(id)}/details`, headers);
+  }
+
+  function fetchDetails(id) {
+    if (!details.has(id))
+      details.set(id, sessionDetails(id).catch(err => {
+        details.delete(id);
+        console.warn(`[Filtro de Logs] sessão ${id}:`, err.message);
+        return null;
+      }));
+    return details.get(id);
+  }
+
+  // Parados em bloco de Espera: quem ainda está no bloco ganha a tag "em espera"
+  async function markWaiting(list) {
+    const a = api.get(list);
+    if (!a?.stuck || !/espera/i.test(blockName(a.blockId))) return;
+    let i = 0, timer;
+    const redraw = () => { clearTimeout(timer); timer = setTimeout(() => api.get(list) === a && apply(list), 250); };
+    const worker = async () => {
+      while (i < a.items.length && api.get(list) === a) {
+        const it = a.items[i++];
+        if (stillIn(await fetchDetails(it.sessionId), it.blockId)) { it.waiting = true; it.text += " em espera"; redraw(); }
+      }
+    };
+    await Promise.all(Array.from({ length: SESSION_PARALLEL }, worker));
   }
 
   function fetchPerson(id) {
@@ -346,6 +382,7 @@
     a.view.remove();
     list.classList.remove("dcf-native-off");
     api.delete(list);
+    updatePickBar(list);
     if (list.isConnected) apply(list);
   }
 
@@ -380,44 +417,114 @@
       });
   }
 
-  function confirmReprocess(list, itemId) {
+  // confirmação no estilo do modal de inspeção; resolve true só no Confirmar
+  function askConfirm(title, html) {
+    return new Promise(resolve => {
+      document.querySelector(".dcf-modal-bg")?.remove();
+      const bg = document.createElement("div");
+      bg.className = "dcf-modal-bg";
+      const src = getComputedStyle(document.querySelector("#sheet") || document.body);
+      if (src.backgroundColor && !/rgba\(.*,\s*0\)|transparent/.test(src.backgroundColor)) bg.style.setProperty("--dcf-mbg", src.backgroundColor);
+      bg.style.setProperty("--dcf-mfg", src.color);
+      bg.innerHTML = `
+        <div class="dcf-confirm" role="dialog" aria-label="${escHtml(title)}">
+          <div class="dcf-mtitle">${PLAY_ICON} ${escHtml(title)}</div>
+          <p>${html}</p>
+          <div class="dcf-mtools"><button data-a="cancel">Cancelar</button><button data-a="ok" class="dcf-primary">Confirmar</button></div>
+        </div>`;
+      document.body.appendChild(bg);
+      const close = ok => { bg.remove(); document.removeEventListener("keydown", onKey, true); resolve(ok); };
+      const onKey = e => { if (e.key === "Escape") { e.stopPropagation(); close(false); } };
+      document.addEventListener("keydown", onKey, true);
+      bg.onclick = e => { if (e.target === bg) close(false); };
+      bg.querySelector('[data-a="cancel"]').onclick = () => close(false);
+      bg.querySelector('[data-a="cancel"]').focus(); // Enter sem querer não reprocessa
+      bg.querySelector('[data-a="ok"]').onclick = () => close(true);
+    });
+  }
+
+  async function runReprocess(it) {
+    const key = `${it.sessionId}|${it.blockId}`;
+    reproc.set(key, { st: "busy" });
+    redrawSession(it.sessionId);
+    try {
+      await reprocess(it.sessionId, it.blockId);
+      reproc.set(key, { st: "ok" });
+      picked.delete(key);
+    } catch (err) {
+      reproc.set(key, { st: "fail", msg: err.message });
+    }
+    redrawSession(it.sessionId);
+    return reproc.get(key).st === "ok";
+  }
+
+  async function confirmReprocess(list, itemId) {
     const it = api.get(list)?.items.find(i => i.id === itemId);
     if (!it || reproc.get(`${it.sessionId}|${it.blockId}`)?.st === "busy") return;
     const name = it.lead || it.contact || fmtPhone(it.phone) || "sem lead";
-    document.querySelector(".dcf-modal-bg")?.remove();
-    const bg = document.createElement("div");
-    bg.className = "dcf-modal-bg";
-    const src = getComputedStyle(document.querySelector("#sheet") || document.body);
-    if (src.backgroundColor && !/rgba\(.*,\s*0\)|transparent/.test(src.backgroundColor)) bg.style.setProperty("--dcf-mbg", src.backgroundColor);
-    bg.style.setProperty("--dcf-mfg", src.color);
-    bg.innerHTML = `
-      <div class="dcf-confirm" role="dialog" aria-label="Reprocessar a sessão">
-        <div class="dcf-mtitle">${PLAY_ICON} Reprocessar a sessão?</div>
-        <p>A sessão de <b>${escHtml(name)}</b> vai rodar de novo a partir do bloco <b>${escHtml(blockName(it.blockId))}</b>.
-           Mensagens deste bloco em diante são enviadas outra vez.</p>
-        <div class="dcf-mtools"><button data-a="cancel">Cancelar</button><button data-a="ok" class="dcf-primary">Confirmar</button></div>
-      </div>`;
-    document.body.appendChild(bg);
-    const close = () => { bg.remove(); document.removeEventListener("keydown", onKey, true); };
-    const onKey = e => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
-    document.addEventListener("keydown", onKey, true);
-    bg.onclick = e => { if (e.target === bg) close(); };
-    bg.querySelector('[data-a="cancel"]').onclick = close;
-    bg.querySelector('[data-a="cancel"]').focus(); // Enter sem querer não reprocessa
-    bg.querySelector('[data-a="ok"]').onclick = async () => {
-      close();
-      const key = `${it.sessionId}|${it.blockId}`;
-      reproc.set(key, { st: "busy" });
-      redrawSession(it.sessionId);
-      try {
-        await reprocess(it.sessionId, it.blockId);
-        reproc.set(key, { st: "ok" });
-      } catch (err) {
-        reproc.set(key, { st: "fail", msg: err.message });
-      }
-      redrawSession(it.sessionId);
-    };
+    const ok = await askConfirm("Reprocessar a sessão?",
+      `A sessão de <b>${escHtml(name)}</b> vai rodar de novo a partir do bloco <b>${escHtml(blockName(it.blockId))}</b>.
+       Mensagens deste bloco em diante são enviadas outra vez.`);
+    if (ok) await runReprocess(it);
   }
+
+  // ---------- seleção para reprocessar em lote ----------
+  // um card por sessão: a mesma sessão repetida no bloco é reprocessada uma vez só
+  function pickedItems(list) {
+    const a = api.get(list), seen = new Set();
+    return (a?.items || []).filter(it => {
+      const k = `${it.sessionId}|${it.blockId}`;
+      if (!picked.has(k) || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
+
+  function pick(list, itemId, on) {
+    const it = api.get(list)?.items.find(i => i.id === itemId);
+    if (!it) return;
+    const k = `${it.sessionId}|${it.blockId}`;
+    if (on) picked.add(k); else picked.delete(k);
+    redrawSession(it.sessionId); // outros cards da mesma sessão acompanham
+    updatePickBar(list);
+  }
+
+  function updatePickBar(list) {
+    const bar = bars.get(list);
+    if (!bar) return;
+    const n = pickedItems(list).length;
+    const btn = bar.querySelector('[data-a="rpsel"]');
+    if (!btn.dataset.running) { btn.textContent = `Reprocessar selecionados (${n})`; btn.disabled = !n; }
+    const all = bar.querySelector('[data-a="pickall"]');
+    const vis = (api.get(list)?.items || []).filter(i => i.visible && i.sessionId && i.blockId);
+    all.checked = !!vis.length && vis.every(i => picked.has(`${i.sessionId}|${i.blockId}`));
+    bar.querySelector(".dcf-pickrow").hidden = !api.has(list);
+    bar.querySelector('[data-a="stuck"]').classList.toggle("dcf-on", !!api.get(list)?.stuck); // aba Parados aberta
+  }
+
+  let bulkStop = false;
+  async function reprocessPicked(list, btn) {
+    if (btn.dataset.running) { bulkStop = true; return; } // segundo clique = cancelar
+    const todo = pickedItems(list);
+    if (!todo.length) return;
+    const ok = await askConfirm(`Reprocessar ${todo.length} ${todo.length === 1 ? "sessão" : "sessões"}?`,
+      `${todo.length === 1 ? "A sessão selecionada vai" : `As ${todo.length} sessões selecionadas vão`} rodar de novo a partir do bloco
+       <b>${escHtml(blockName(todo[0].blockId))}</b>, uma por vez. Mensagens deste bloco em diante são enviadas outra vez.`);
+    if (!ok) return;
+    bulkStop = false;
+    btn.dataset.running = "1";
+    let done = 0, fail = 0;
+    for (const it of todo) {
+      if (bulkStop) break;
+      btn.textContent = `Reprocessando ${done + fail + 1}/${todo.length}… (Cancelar)`;
+      if (await runReprocess(it)) done++; else fail++;
+    }
+    delete btn.dataset.running;
+    updatePickBar(list);
+    setCount(list, ...countOf(list), ` – reprocessados: ${done}${fail ? `, falharam: ${fail}` : ""}${bulkStop ? " (cancelado)" : ""}`);
+  }
+
+  const countOf = list => { const it = api.get(list)?.items || []; return [it.filter(i => i.visible).length, it.length]; };
 
   // mesma ação do card do Clássico; clicar de novo na mesma sessão apaga o caminho (como no Clássico)
   function selectSession(id) {
@@ -628,6 +735,44 @@
     return apply(list);
   }
 
+  // aba "Parados" da extensão: Entraram menos (Sucessos + Erros) do bloco aberto, cruzando pela sessão
+  async function loadStuck(list, btn) {
+    if (mode === "classic" || !lastReq) return [];
+    const my = ++loadSeq;
+    let userCancel = false;
+    const cancelled = () => userCancel || my !== loadSeq;
+    btn.disabled = true;
+    list.classList.add("dcf-native-off");
+    api.get(list)?.view.classList.add("dcf-native-off");
+    const loading = showLoading(list, () => { userCancel = true; });
+    const TYPES = [["entered", "Entraram"], ["succeeded", "Sucessos"], ["error", "Erros"], ["warning", "Alertas"]];
+    const got = {};
+    let err = "";
+    try {
+      for (const [type, label] of TYPES) {
+        loading.update(0, null);
+        const data = await fetchAllLogs((n, total) => !cancelled() && loading.update(n, total), cancelled, type);
+        if (cancelled()) break;
+        got[type] = data;
+        if (data.error) err = `${label}: ${data.error}`; // faltou parte: a lista pode trazer quem não está parado
+        btn.textContent = `Parados… (${label})`;
+      }
+      if (!cancelled()) {
+        const blockId = new URL(lastReq.url).searchParams.get("filter[flowBlockId]") || "";
+        const items = stuckItems(got.entered.items, got.succeeded.items, got.error.items, got.warning.items);
+        enterApi(list, { items, from: state.from, to: state.to, key: reqKey(lastReq.url), error: err, stuck: true, blockId });
+        markWaiting(list);
+      }
+    } catch (e) {
+      if (!cancelled()) setCount(list, 0, 0, ` – não foi possível montar os parados: ${e.message}`);
+      if (!api.has(list)) list.classList.remove("dcf-native-off");
+    }
+    loading.remove();
+    api.get(list)?.view.classList.remove("dcf-native-off");
+    if (my === loadSeq) { btn.textContent = "Parados"; btn.disabled = false; }
+    return api.has(list) ? apply(list) : [];
+  }
+
   function tabName() {
     const tab = document.querySelector('[role="tab"][aria-selected="true"], [role="tab"][data-state="active"]');
     return (tab?.innerText || "logs").trim().toLowerCase().normalize("NFD").replace(/[^\w]+/g, "-");
@@ -636,7 +781,7 @@
   // baixa as linhas que passam no filtro (sem filtro = todas)
   async function downloadCsv(list, btn) {
     const a = api.get(list);
-    const fresh = a && a.from === state.from && a.to === state.to && !a.error;
+    const fresh = a && ((a.from === state.from && a.to === state.to && !a.error) || a.stuck);
     const rows = (fresh ? apply(list) : await loadEverything(list, bars.get(list).querySelector('[data-a="load"]')))
       .filter(i => i.visible);
     btn.disabled = true;
@@ -646,7 +791,7 @@
     const d = new Date();
     const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
     const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" })); // BOM = acentos certos no Excel
-    const link = Object.assign(document.createElement("a"), { href: url, download: `logs-${tabName()}-${stamp}.csv` });
+    const link = Object.assign(document.createElement("a"), { href: url, download: `logs-${a?.stuck ? "parados" : tabName()}-${stamp}.csv` });
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -677,8 +822,13 @@
       </div>
       <div class="dcf-row">
         <button data-a="load">Carregar tudo</button>
+        <button data-a="stuck" title="Quem entrou neste bloco e não tem sucesso nem erro">Parados</button>
         <button data-a="csv">Baixar CSV</button>
         <button data-a="clear">Limpar</button>
+      </div>
+      <div class="dcf-row dcf-pickrow" hidden>
+        <label title="Marca todos os logs que passam no filtro"><input type="checkbox" data-a="pickall"> Selecionar todos</label>
+        <button data-a="rpsel" disabled>Reprocessar selecionados (0)</button>
       </div>`;
 
     const min = retentionStart(), p2 = n => String(n).padStart(2, "0");
@@ -695,7 +845,9 @@
         // período mudou com dados da API na tela: busca de novo com o novo período
         if ((k === "from" || k === "to") && api.has(list)) {
           clearTimeout(refetchTimer);
-          refetchTimer = setTimeout(() => loadEverything(list, bar.querySelector('[data-a="load"]')), 800);
+          refetchTimer = setTimeout(() => api.get(list)?.stuck
+            ? loadStuck(list, bar.querySelector('[data-a="stuck"]'))
+            : loadEverything(list, bar.querySelector('[data-a="load"]')), 800);
         }
       });
     });
@@ -707,6 +859,14 @@
       bars.forEach(b => (b.querySelector('[data-a="auto"]').checked = auto));
     };
     bar.querySelector('[data-a="load"]').onclick = e => loadEverything(list, e.currentTarget);
+    bar.querySelector('[data-a="stuck"]').onclick = e => loadStuck(list, e.currentTarget);
+    bar.querySelector('[data-a="rpsel"]').onclick = e => reprocessPicked(list, e.currentTarget);
+    bar.querySelector('[data-a="pickall"]').onchange = e => {
+      const vis = (api.get(list)?.items || []).filter(i => i.visible && i.sessionId && i.blockId);
+      for (const i of vis) { const k = `${i.sessionId}|${i.blockId}`; if (e.target.checked) picked.add(k); else picked.delete(k); }
+      apply(list);
+      updatePickBar(list);
+    };
     bar.querySelector('[data-a="csv"]').onclick = e => downloadCsv(list, e.currentTarget);
     bar.querySelector('[data-a="clear"]').onclick = () => {
       Object.assign(state, { q: "", from: "", to: "", unique: false, onlyDup: false });

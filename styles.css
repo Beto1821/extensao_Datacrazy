@@ -225,6 +225,10 @@ html.dark .dcf-bar input { color-scheme: dark; }
 .dcf-rp { padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; white-space: nowrap; }
 .dcf-rp-ok { color: #16a34a; background: #22c55e26; }
 .dcf-rp-fail { color: #dc2626; background: #ef444426; }
+.dcf-rp-wait { color: #2563eb; background: #3b82f626; }
+.dcf-chk { flex: none; align-self: center; margin: 0 -2px 0 0; cursor: pointer; }
+.dcf-bar button[data-a="stuck"].dcf-on { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+.dcf-bar button[data-a="rpsel"]:not(:disabled) { background: #16a34a; border-color: #16a34a; color: #fff; }
 
 /* confirmação do reprocessar */
 .dcf-confirm {

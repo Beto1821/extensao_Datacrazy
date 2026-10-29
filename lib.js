@@ -62,6 +62,25 @@
     };
   }
 
+  // "Parados": sessões que entraram no bloco e não têm log de sucesso nem de erro nele.
+  // Um card por sessão (a entrada mais recente); quem tem alerta ganha it.alert com a frase do alerta.
+  function stuckItems(entered, succeeded, errors, alerts = []) {
+    const out = new Set([...succeeded, ...errors].map(i => i.sessionId));
+    const alertOf = new Map(alerts.map(i => [i.sessionId, i]));
+    const seen = new Set(), res = [];
+    for (const it of [...entered].sort((a, b) => b.date - a.date)) {
+      if (!it.sessionId || out.has(it.sessionId) || seen.has(it.sessionId)) continue;
+      seen.add(it.sessionId);
+      const al = alertOf.get(it.sessionId);
+      res.push(al ? { ...it, alert: true, errorMsg: al.errorMsg, errorCode: al.errorCode } : { ...it });
+    }
+    return res;
+  }
+
+  // sessão ainda dentro do bloco (histórico sem horário de saída)
+  const stillIn = (details, blockId) =>
+    (details?.history || []).some(h => h.flowBlockId === blockId && !h.exitedDate);
+
   // marca it.visible e it.count em cada log, conforme o estado da barra
   function filterItems(items, state) {
     const terms = state.q.toLowerCase().split(",").map(s => s.trim()).filter(Boolean).map(t => ({
@@ -133,7 +152,7 @@
     return { name, phone };
   }
 
-  const lib = { DATE_RE, TYPE_LABEL, pad, fmtDate, escHtml, reqKey, parseLines, errorText, fromApi, filterItems,
+  const lib = { DATE_RE, TYPE_LABEL, pad, fmtDate, escHtml, reqKey, parseLines, errorText, fromApi, stuckItems, stillIn, filterItems,
                 fmtPhone, hue, dayLabel, unwrap, personOf };
   if (typeof module === "object" && module.exports) module.exports = lib;
   else root.dcfLib = lib;

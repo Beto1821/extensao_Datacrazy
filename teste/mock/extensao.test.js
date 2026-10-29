@@ -204,3 +204,64 @@ test("▶ com erro mostra a falha no card e libera o botão", comCrm({
   assert.equal(await p.locator(".dcf-play").isDisabled(), false);
   assert.equal(crm.stats.reprocessCalls.length, 1, "erro 400 não repete o pedido");
 }));
+
+const E = "bloco-espera";
+const parado = (block, type, i, name) => log(block, type, i, { lead: { name }, contactId: `551190000000${i}` });
+
+test("Parados: entrou sem sucesso nem erro; alerta ganha tag", comCrm({
+  logs: {
+    [`${A}|entered`]: [0, 1, 2, 3].map(i => parado(A, "entered", i, `Lead ${i}`)),
+    [`${A}|succeeded`]: [parado(A, "succeeded", 0, "Lead 0")],
+    [`${A}|error`]: [parado(A, "error", 1, "Lead 1")],
+    [`${A}|warning`]: [parado(A, "warning", 3, "Lead 3")]
+  }
+}, async crm => {
+  await crm.abrirBloco(A);
+  await crm.esperarLista();
+  const p = crm.page;
+  await p.locator('[data-a="stuck"]').click();
+  await p.waitForFunction(() => /parados/.test(document.querySelector(".dcf-count")?.textContent));
+  assert.deepEqual((await crm.itens()).map(i => i.sid), ["s2", "s3"]);
+  assert.equal(await crm.contador(), "Mostrando 2 de 2 parados");
+  assert.equal(await p.locator('.dcf-item[data-sid="s3"] .dcf-rep').innerText(), "alerta");
+}));
+
+test("Parados em bloco de Espera: quem ainda está no bloco ganha \"em espera\"", comCrm({
+  logs: { [`${E}|entered`]: [0, 1].map(i => parado(E, "entered", i, `Lead ${i}`)),
+          [`${E}|succeeded`]: [parado(E, "succeeded", 5, "Lead 5")] }, // sem card nenhum a barra não aparece
+  sessions: {
+    s0: { ...session("s0", "Lead 0", "1"), history: [{ flowBlockId: E, enteredDate: "2026-10-27T10:00:00Z", exitedDate: null }] },
+    s1: { ...session("s1", "Lead 1", "1"), history: [{ flowBlockId: E, enteredDate: "2026-10-27T10:00:00Z", exitedDate: "2026-10-27T10:05:00Z" }] }
+  }
+}, async crm => {
+  await crm.abrirBloco(E);
+  await crm.esperarLista();
+  const p = crm.page;
+  await p.locator('[data-a="stuck"]').click();
+  await p.locator('.dcf-item[data-sid="s0"] .dcf-rp-wait').waitFor();
+  assert.equal(await p.locator('.dcf-item[data-sid="s1"] .dcf-rp-wait').count(), 0);
+}));
+
+test("caixinhas: reprocessa os selecionados um por vez, sessão repetida uma vez só", comCrm({
+  logs: { [`${A}|succeeded`]: [0, 1, 2].map(i => parado(A, "succeeded", i, `Lead ${i}`))
+    .concat([log(A, "succeeded", 9, { flowSessionId: "s0", lead: { name: "Lead 0" }, contactId: "5511900000000" })]) },
+  reprocessStatus: id => id === "s2" ? 500 : undefined
+}, async crm => {
+  await crm.abrirBloco(A);
+  await crm.esperarLista();
+  const p = crm.page;
+  const btn = p.locator('[data-a="rpsel"]');
+  assert.equal(await btn.isDisabled(), true);
+  await p.locator('[data-a="pickall"]').check();
+  assert.equal(await btn.innerText(), "Reprocessar selecionados (3)");
+  await p.locator('.dcf-item[data-sid="s1"] .dcf-chk').uncheck();
+  assert.equal(await btn.innerText(), "Reprocessar selecionados (2)");
+  assert.equal(await p.locator(".dcf-sel").count(), 0, "caixinha não seleciona o card");
+  await btn.click();
+  assert.match(await p.locator(".dcf-confirm").innerText(), /2 sessões/);
+  await p.locator('.dcf-confirm [data-a="ok"]').click();
+  await p.waitForFunction(() => /reprocessados: 1, falharam: 1/.test(document.querySelector(".dcf-count")?.textContent));
+  assert.deepEqual(crm.stats.reprocessCalls.map(c => c.id), ["s0", "s2"]);
+  assert.equal(await p.locator('.dcf-item[data-sid="s0"] .dcf-rp-ok').count(), 2, "os dois cards da sessão s0");
+  assert.equal(await btn.innerText(), "Reprocessar selecionados (1)", "a que falhou continua marcada");
+}));
