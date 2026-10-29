@@ -220,6 +220,28 @@ html.dark .dcf-bar input { color-scheme: dark; }
 }
 .dcf-db:hover { opacity: 1; background: rgba(128, 128, 128, .2); color: #3b82f6; }
 
+.dcf-db:disabled { cursor: default; opacity: .4; }
+.dcf-play:hover { color: #16a34a; }
+.dcf-rp { padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.dcf-rp-ok { color: #16a34a; background: #22c55e26; }
+.dcf-rp-fail { color: #dc2626; background: #ef444426; }
+
+/* confirmação do reprocessar */
+.dcf-confirm {
+  width: min(420px, 100%);
+  padding: 18px 20px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(128, 128, 128, .3);
+  background: var(--dcf-mbg, Canvas);
+  color: var(--dcf-mfg, CanvasText);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .45);
+  font-size: 13px;
+}
+.dcf-confirm p { margin: 10px 0 16px; line-height: 1.45; opacity: .85; }
+.dcf-confirm .dcf-mtools { justify-content: flex-end; }
+.dcf-confirm .dcf-primary { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+.dcf-confirm .dcf-primary:hover { background: #2563eb; }
+
 /* modal de inspeção da sessão */
 .dcf-modal-bg {
   position: fixed;

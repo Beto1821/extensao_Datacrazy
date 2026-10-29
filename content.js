@@ -25,6 +25,7 @@
   const toggles = new Map(); // list element -> seletor Clássico/Crazy
   let selSession = null;     // sessão cujo caminho está desenhado sobre os blocos
   let errorTexts = {};       // código de erro -> frase traduzida do CRM (vem do hook.js)
+  const reproc = new Map();  // "sessão|bloco" -> { st: "busy" | "ok" | "fail", msg } do botão reprocessar
 
   // ---------- captura da rota (mensagens do hook.js) ----------
   window.addEventListener("message", e => {
@@ -232,16 +233,22 @@
     const name = it.lead || it.contact || fmtPhone(it.phone) || "(sem lead)";
     const sub = it.lead && it.contact && it.contact !== it.lead ? `<div class="dcf-sub">Contato: ${escHtml(it.contact)}</div>` : "";
     const time = `${pad(it.date.getHours())}:${pad(it.date.getMinutes())}`;
+    const rp = reproc.get(`${it.sessionId}|${it.blockId}`);
+    const play = it.sessionId && it.blockId
+      ? `<button class="dcf-db dcf-play" title="Reprocessar a sessão a partir deste bloco"${rp?.st === "busy" ? " disabled" : ""}>${rp?.st === "busy" ? "…" : PLAY_ICON}</button>` : "";
+    const rpTag = rp?.st === "ok" ? `<span class="dcf-rp dcf-rp-ok">reprocessado</span>`
+      : rp?.st === "fail" ? `<span class="dcf-rp dcf-rp-fail">falhou: ${escHtml(rp.msg)}</span>` : "";
     return `
-      <div class="dcf-item dcf-k-${kind}${it.sessionId && it.sessionId === selSession ? " dcf-sel" : ""}" data-sid="${escHtml(it.sessionId)}">
+      <div class="dcf-item dcf-k-${kind}${it.sessionId && it.sessionId === selSession ? " dcf-sel" : ""}" data-sid="${escHtml(it.sessionId)}" data-id="${escHtml(it.id)}">
         <div class="dcf-av" style="--h:${hue(name)}">${escHtml((name.match(/[\p{L}\d]/u) || ["?"])[0].toUpperCase())}</div>
         <div class="dcf-main">
-          <div class="dcf-l1"><span class="dcf-name">${escHtml(name)}</span><span class="dcf-time">${time}</span>${it.sessionId ? `<button class="dcf-db" title="Inspecionar dados da sessão">${DB_ICON}</button>` : ""}</div>
+          <div class="dcf-l1"><span class="dcf-name">${escHtml(name)}</span><span class="dcf-time">${time}</span>${it.sessionId ? `<button class="dcf-db" title="Inspecionar dados da sessão">${DB_ICON}</button>` : ""}${play}</div>
           ${sub}
           <div class="dcf-l2">
             ${it.phone ? `<span class="dcf-phone">${escHtml(fmtPhone(it.phone))}</span>` : ""}
             <span class="dcf-pill"${it.errorCode ? ` title="${escHtml(it.errorCode)}"` : ""}>${escHtml(label)}${it.errorCode && !it.errorMsg ? ` · ${escHtml(it.errorCode)}` : ""}</span>
             ${it.count > 1 ? `<span class="dcf-rep">repetido ${it.count}x</span>` : ""}
+            ${rpTag}
           </div>
           ${it.errorMsg ? `<div class="dcf-msg">${escHtml(it.errorMsg)}</div>` : ""}
         </div>
@@ -277,6 +284,7 @@
     view.onclick = e => {
       const item = e.target.closest(".dcf-item[data-sid]");
       if (!item?.dataset.sid) return;
+      if (e.target.closest(".dcf-play")) return void confirmReprocess(list, item.dataset.id);
       if (e.target.closest(".dcf-db")) return void openSession(item.dataset.sid);
       selectSession(item.dataset.sid);
     };
@@ -343,6 +351,73 @@
 
   // ---------- sessão do log: caminho nos blocos + inspeção ----------
   const DB_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>`;
+
+  const PLAY_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>`;
+
+  // ---------- reprocessar a sessão a partir do bloco do log (mesma rota do ▶ do Clássico) ----------
+  // sem repetir em erro de rede ou 5xx: o reprocesso pode ter rodado e mandaria a mensagem duas vezes
+  async function reprocess(sessionId, blockId) {
+    if (!lastReq) throw new Error("rota de logs ainda não capturada");
+    const headers = { ...lastReq.headers, "content-type": "application/json" };
+    delete headers["x-dz-include-totals"];
+    const url = `${new URL(lastReq.url).origin}/api/crm/flow-sessions/${encodeURIComponent(sessionId)}/reprocess`;
+    const body = JSON.stringify({ reprocessFromBlockId: blockId });
+    const send = () => fetch(url, { method: "POST", headers, body, cache: "no-store" });
+    let res = await send();
+    if (res.status === 401 || res.status === 403) { // recusado antes de rodar: pode tentar com assinatura nova
+      const sig = await freshSignature();
+      if (sig) { headers["x-signature"] = sig; res = await send(); }
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  }
+
+  // redesenha só os cards da sessão (a lista inteira perderia o que está aberto)
+  function redrawSession(sessionId) {
+    for (const a of api.values())
+      a.view.querySelectorAll(`.dcf-item[data-sid="${CSS.escape(sessionId)}"]`).forEach(el => {
+        const it = a.items.find(i => i.id === el.dataset.id);
+        if (it) el.outerHTML = itemHtml(it);
+      });
+  }
+
+  function confirmReprocess(list, itemId) {
+    const it = api.get(list)?.items.find(i => i.id === itemId);
+    if (!it || reproc.get(`${it.sessionId}|${it.blockId}`)?.st === "busy") return;
+    const name = it.lead || it.contact || fmtPhone(it.phone) || "sem lead";
+    document.querySelector(".dcf-modal-bg")?.remove();
+    const bg = document.createElement("div");
+    bg.className = "dcf-modal-bg";
+    const src = getComputedStyle(document.querySelector("#sheet") || document.body);
+    if (src.backgroundColor && !/rgba\(.*,\s*0\)|transparent/.test(src.backgroundColor)) bg.style.setProperty("--dcf-mbg", src.backgroundColor);
+    bg.style.setProperty("--dcf-mfg", src.color);
+    bg.innerHTML = `
+      <div class="dcf-confirm" role="dialog" aria-label="Reprocessar a sessão">
+        <div class="dcf-mtitle">${PLAY_ICON} Reprocessar a sessão?</div>
+        <p>A sessão de <b>${escHtml(name)}</b> vai rodar de novo a partir do bloco <b>${escHtml(blockName(it.blockId))}</b>.
+           Mensagens deste bloco em diante são enviadas outra vez.</p>
+        <div class="dcf-mtools"><button data-a="cancel">Cancelar</button><button data-a="ok" class="dcf-primary">Confirmar</button></div>
+      </div>`;
+    document.body.appendChild(bg);
+    const close = () => { bg.remove(); document.removeEventListener("keydown", onKey, true); };
+    const onKey = e => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+    document.addEventListener("keydown", onKey, true);
+    bg.onclick = e => { if (e.target === bg) close(); };
+    bg.querySelector('[data-a="cancel"]').onclick = close;
+    bg.querySelector('[data-a="cancel"]').focus(); // Enter sem querer não reprocessa
+    bg.querySelector('[data-a="ok"]').onclick = async () => {
+      close();
+      const key = `${it.sessionId}|${it.blockId}`;
+      reproc.set(key, { st: "busy" });
+      redrawSession(it.sessionId);
+      try {
+        await reprocess(it.sessionId, it.blockId);
+        reproc.set(key, { st: "ok" });
+      } catch (err) {
+        reproc.set(key, { st: "fail", msg: err.message });
+      }
+      redrawSession(it.sessionId);
+    };
+  }
 
   // mesma ação do card do Clássico; clicar de novo na mesma sessão apaga o caminho (como no Clássico)
   function selectSession(id) {

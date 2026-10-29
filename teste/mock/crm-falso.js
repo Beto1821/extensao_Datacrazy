@@ -70,10 +70,11 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CRM falso<
 </script></body></html>`;
 
 // cenário: { logs: { "bloco|tipo": [log...] }, sessions: { id: sessão }, pageCap, sessionDelay,
-//            sessionStatus(id, tentativa) -> status|undefined, logsStatus(skip, headers) -> status|undefined }
+//            sessionStatus(id, tentativa) -> status|undefined,
+//            reprocessStatus(id) -> status|undefined, logsStatus(skip, headers) -> status|undefined }
 async function abrir(cenario = {}) {
   const sc = { logs: {}, sessions: {}, pageCap: 93, sessionDelay: 0, ...cenario };
-  const stats = { sessionCalls: {}, inFlight: 0, maxInFlight: 0, logsCalls: [], signatures: new Set() };
+  const stats = { sessionCalls: {}, inFlight: 0, maxInFlight: 0, logsCalls: [], signatures: new Set(), reprocessCalls: [] };
   const exe = process.env.CHROMIUM_PATH || undefined;
   const browser = await chromium.launch({ headless: process.env.HEADED ? false : true, executablePath: exe });
   const context = await browser.newContext({ acceptDownloads: true, timezoneId: "America/Sao_Paulo", locale: "pt-BR" });
@@ -87,6 +88,14 @@ async function abrir(cenario = {}) {
     const json = (status, body) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     if (u.pathname.startsWith("/flow/")) return route.fulfill({ contentType: "text/html", body: PAGE });
     if (u.pathname === "/api/time") return json(200, { iso: new Date().toISOString() });
+
+    const rp = u.pathname.match(/^\/api\/crm\/flow-sessions\/([^/]+)\/reprocess$/);
+    if (rp && req.method() === "POST") {
+      const id = decodeURIComponent(rp[1]);
+      stats.reprocessCalls.push({ id, body: JSON.parse(req.postData() || "null"), type: req.headers()["content-type"] });
+      const st = sc.reprocessStatus?.(id);
+      return st ? json(st, { message: "erro simulado" }) : route.fulfill({ status: 204, body: "" });
+    }
 
     const m = u.pathname.match(/^\/api\/crm\/flow-sessions\/([^/]+)\/details$/);
     if (m) {

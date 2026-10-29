@@ -56,7 +56,7 @@
     const contact = (r.contactName || "").trim();
     const phone = r.contactId || "";
     return {
-      id: `${r.flowSessionId}|${r.createdAt}`, sessionId: r.flowSessionId || "", date, dateText: fmtDate(date), status, lead, contact, phone,
+      id: `${r.flowSessionId}|${r.createdAt}`, sessionId: r.flowSessionId || "", blockId: r.flowBlockId || "", date, dateText: fmtDate(date), status, lead, contact, phone,
       type: r.type, errorCode: r.errorCode || "", errorMsg,
       text: [fmtDate(date), status, r.errorCode, lead, contact, phone, r.message].join(" ").toLowerCase()
     };

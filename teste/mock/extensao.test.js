@@ -158,3 +158,49 @@ test("nome com HTML aparece como texto (sem injetar código)", comCrm({
   assert.equal(await crm.page.evaluate(() => window.__xss), undefined);
   assert.equal((await crm.itens())[0].name, `<img src=x onerror="window.__xss=1">`);
 }));
+
+test("▶ reprocessa a sessão a partir do bloco do log, depois de confirmar", comCrm({
+  logs: { [`${A}|entered`]: [log(A, "entered", 0, { lead: { name: "Maria Teste" }, contactId: "5511987654321" })] }
+}, async crm => {
+  await crm.abrirBloco(A, "Sucessos");
+  await crm.aba("Entraram");
+  await crm.esperarLista();
+  const p = crm.page;
+  await p.locator(".dcf-play").click();
+  await p.getByText("Ação", { exact: true }).last().waitFor(); // nome do bloco na confirmação
+  assert.match(await p.locator(".dcf-confirm").innerText(), /Maria Teste/);
+  assert.equal(await p.locator(".dcf-sel").count(), 0, "clicar no ▶ não seleciona o card");
+  await p.locator('.dcf-confirm [data-a="ok"]').click();
+  await p.locator(".dcf-rp-ok").waitFor();
+  assert.deepEqual(crm.stats.reprocessCalls, [{ id: "s0", body: { reprocessFromBlockId: A }, type: "application/json" }]);
+}));
+
+test("▶ cancelado não chama a API", comCrm({
+  logs: { [`${A}|succeeded`]: [log(A, "succeeded", 0, { lead: { name: "Maria Teste" }, contactId: "5511987654321" })] }
+}, async crm => {
+  await crm.abrirBloco(A);
+  await crm.esperarLista();
+  const p = crm.page;
+  await p.locator(".dcf-play").click();
+  await p.locator('.dcf-confirm [data-a="cancel"]').click();
+  await p.locator(".dcf-play").click();
+  await p.keyboard.press("Escape");
+  await p.waitForTimeout(300);
+  assert.equal(await p.locator(".dcf-confirm").count(), 0);
+  assert.deepEqual(crm.stats.reprocessCalls, []);
+}));
+
+test("▶ com erro mostra a falha no card e libera o botão", comCrm({
+  logs: { [`${A}|error`]: [log(A, "error", 0, { lead: { name: "Maria Teste" }, contactId: "5511987654321" })] },
+  reprocessStatus: () => 400
+}, async crm => {
+  await crm.abrirBloco(A, "Erros");
+  await crm.esperarLista();
+  const p = crm.page;
+  await p.locator(".dcf-play").click();
+  await p.locator('.dcf-confirm [data-a="ok"]').click();
+  await p.locator(".dcf-rp-fail").waitFor();
+  assert.equal(await p.locator(".dcf-rp-fail").innerText(), "falhou: HTTP 400");
+  assert.equal(await p.locator(".dcf-play").isDisabled(), false);
+  assert.equal(crm.stats.reprocessCalls.length, 1, "erro 400 não repete o pedido");
+}));
