@@ -7,7 +7,12 @@
   const origFetch = window.fetch;
   let last = null; // guardado para o content.js, que carrega depois da primeira chamada
 
-  const send = () => last && window.postMessage({ source: "dcf-hook", type: "logs-request", ...last }, location.origin);
+  const send = () => {
+    if (!last) return;
+    const texts = errorTexts();
+    if (texts) window.postMessage({ source: "dcf-hook", type: "error-texts", texts }, location.origin);
+    window.postMessage({ source: "dcf-hook", type: "logs-request", ...last }, location.origin);
+  };
   window.addEventListener("message", e => {
     if (e.source !== window || e.data?.source !== "dcf-content") return;
     if (e.data.type === "get-last") send();
@@ -33,6 +38,29 @@
         const h = d.memoizedValue?.sessionHistory;
         if (typeof h?.loadSessionHistory === "function") return void h.loadSessionHistory(id).catch(() => {});
       }
+  }
+
+  // traduções do CRM (next-intl): o objeto messages está nas props do provider, acima do editor.
+  // O log só traz o código (ex.: "chat.errors.invalid-whatsapp-number"); a frase sai daqui.
+  let texts = null;
+  function errorTexts() {
+    if (texts) return texts;
+    const el = document.querySelector(".react-flow");
+    const fk = el && Object.keys(el).find(k => k.startsWith("__reactFiber"));
+    for (let f = fk && el[fk]; f; f = f.return) {
+      const m = f.memoizedProps?.messages;
+      if (m && typeof m === "object" && !Array.isArray(m)) return texts = flatErrors(m);
+    }
+    return null;
+  }
+  // só as frases de erro, com a chave completa: { "chat.errors.x": "..." }
+  function flatErrors(o, pre = "", inErr = false, out = {}) {
+    for (const [k, v] of Object.entries(o)) {
+      const key = pre ? `${pre}.${k}` : k;
+      if (typeof v === "string") { if (inErr) out[key] = v; }
+      else if (v && typeof v === "object") flatErrors(v, key, inErr || k === "errors", out);
+    }
+    return out;
   }
 
   window.fetch = function (input, init) {

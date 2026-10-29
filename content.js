@@ -24,11 +24,14 @@
   try { mode = localStorage.getItem("dcf-mode") === "classic" ? "classic" : "crazy"; } catch {}
   const toggles = new Map(); // list element -> seletor Clássico/Crazy
   let selSession = null;     // sessão cujo caminho está desenhado sobre os blocos
+  let errorTexts = {};       // código de erro -> frase traduzida do CRM (vem do hook.js)
 
   // ---------- captura da rota (mensagens do hook.js) ----------
   window.addEventListener("message", e => {
     const d = e.data;
-    if (e.source !== window || !d || d.source !== "dcf-hook" || d.type !== "logs-request") return;
+    if (e.source !== window || !d || d.source !== "dcf-hook") return;
+    if (d.type === "error-texts") return void (errorTexts = d.texts || {});
+    if (d.type !== "logs-request") return;
     lastReq = { url: d.url, headers: d.headers };
     // outro bloco ou outra aba na aplicação: volta à lista nativa. Recargas do mesmo bloco/aba
     // (ex.: seletor "Última semana") não derrubam a lista carregada pela extensão.
@@ -158,7 +161,7 @@
     const add = page => {
       let added = 0;
       for (const r of page) {
-        const it = fromApi(r);
+        const it = fromApi(r, errorTexts);
         if (!seen.has(it.id)) { seen.add(it.id); out.push(it); added++; }
       }
       return added;
@@ -237,9 +240,10 @@
           ${sub}
           <div class="dcf-l2">
             ${it.phone ? `<span class="dcf-phone">${escHtml(fmtPhone(it.phone))}</span>` : ""}
-            <span class="dcf-pill">${escHtml(label)}${it.errorCode ? ` · ${escHtml(it.errorCode)}` : ""}</span>
+            <span class="dcf-pill"${it.errorCode ? ` title="${escHtml(it.errorCode)}"` : ""}>${escHtml(label)}${it.errorCode && !it.errorMsg ? ` · ${escHtml(it.errorCode)}` : ""}</span>
             ${it.count > 1 ? `<span class="dcf-rep">repetido ${it.count}x</span>` : ""}
           </div>
+          ${it.errorMsg ? `<div class="dcf-msg">${escHtml(it.errorMsg)}</div>` : ""}
         </div>
       </div>`;
   }

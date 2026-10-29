@@ -2,7 +2,7 @@
 
 Extensão para Google Chrome que adiciona uma barra de filtro na aba **Logs** do bloco do CRM Datacrazy (`https://crm.datacrazy.io`). Com ela você filtra os logs por nome, telefone, status e período, encontra contatos repetidos e baixa o resultado em planilha (CSV).
 
-Versão atual: **1.8.1**
+Versão atual: **1.8.2**
 
 Desenvolvido por **Adalberto Ribeiro** – Time Tigers Datacrazy.
 
@@ -107,6 +107,7 @@ Outros detalhes:
 - O filtro continua valendo ao trocar entre as abas Entraram, Sucessos, Alertas e Erros.
 - **Clique num log** da lista: o Datacrazy desenha o caminho daquela sessão em cima dos blocos (ordem e horário em que entrou em cada um), igual ao card do modo Clássico. Clique de novo no mesmo log para apagar.
 - **Nome e telefone em todos os blocos**: blocos antes do "Criar lead" (por exemplo, o Início com webhook) não trazem lead nem contato no log, e o bloco "Criar lead" traz o nome sem o telefone. Nesses logs a extensão busca os dados da sessão e mostra o nome e o telefone que chegaram no webhook. Os nomes aparecem aos poucos, logo depois da lista carregar. A busca, os filtros e o CSV também usam esses dados.
+- **Mensagem de erro traduzida**: na aba Erros, cada log mostra a mesma frase do modo Clássico (por exemplo, "O número de telefone do destinatário não é um número de WhatsApp válido..."), abaixo da etiqueta **✕ Erro**. O código original (`chat.errors.invalid-whatsapp-number`) aparece ao parar o mouse sobre a etiqueta. A busca acha pela frase ou pelo código, e o CSV leva a frase na coluna `status`.
 - **Ícone de banco de dados** no log: abre a inspeção da sessão, com os metadados, os parâmetros, os datasources e o histórico de blocos (nome, horário e tempo em cada bloco). Mostra em árvore ou JSON puro (**Raw**), e o botão **Copiar JSON** copia a seção aberta.
 
 ### Sobre o arquivo CSV
@@ -123,6 +124,8 @@ Quando você clica num bloco, o Datacrazy chama a rota de logs (`/api/crm/flows/
 Se a rota falhar (por exemplo, sessão expirada), a extensão volta ao modo antigo: rola a lista da página até o fim, o que é mais lento. Ao trocar de bloco ou de aba no Datacrazy, a lista volta a ser a original da página. Recargas da mesma aba (por exemplo, o seletor "Última semana") não apagam a lista carregada.
 
 Para os logs sem nome ou telefone, a extensão também chama `/api/crm/flow-sessions/<sessão>/details` (6 ao mesmo tempo, uma vez por sessão) e usa `parameters.leadName`/`leadPhone` ou o nome e telefone do datasource do webhook.
+
+O log de erro traz só o código (por exemplo, `chat.errors.invalid-whatsapp-number`). A tradução vem do próprio Datacrazy: o `hook.js` lê as frases de erro que a página já carregou (as mesmas que o modo Clássico usa), sem nenhuma chamada a mais. Código sem tradução aparece como está.
 
 Se uma página demorar mais de 30 segundos, a extensão tenta de novo (até 3 vezes). Se mesmo assim falhar no meio, mostra o que já veio com o aviso **"incompleto"** no contador.
 
@@ -156,6 +159,7 @@ Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois,
 | **Carregar tudo** ficou lento (rolando a lista) | A busca direta falhou. Clique no bloco de novo (para o Datacrazy refazer a chamada) e tente outra vez. Se continuar, recarregue a página (F5). |
 | Logs de março não aparecem quando a extensão rola a lista (busca direta falhou) | A versão 1.8.0 e as anteriores não reconheciam a data com "ç". Atualize para a 1.8.1 ou mais nova. |
 | Log aparece como "(sem lead)" ou sem telefone | Os nomes e telefones da sessão chegam aos poucos depois da lista carregar: espere alguns segundos. Se continuar, o webhook daquela sessão chegou sem nome e sem telefone (abra o ícone de banco de dados e veja **Datasources**). Precisa da versão 1.8.0 ou mais nova. |
+| Erro aparece só com o código (`chat.errors...`), sem a frase | Versão 1.8.1 e anteriores não traduziam. Atualize para a 1.8.2 ou mais nova. Se continuar, o Datacrazy ainda não tem tradução para esse código. |
 | O calendário de **De:** / **Até:** não abre | Versão 1.7.0 tinha esse erro. Atualize para a 1.7.1 ou mais nova (veja [Atualizar](#atualizar-para-uma-nova-versão)) e clique em recarregar no card da extensão. |
 | O Chrome bloqueia o download | Permita downloads para `crm.datacrazy.io` nas configurações do Chrome. |
 | Aviso "Desativar extensões no modo desenvolvedor" ao abrir o Chrome | É normal para extensões instaladas por pasta. Feche o aviso (não clique em desativar). |

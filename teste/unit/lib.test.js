@@ -150,3 +150,20 @@ test("filtro: log sem telefone, lead e contato nunca é repetido", () => {
   assert.deepEqual(lib.filterItems(two, st({ onlyDup: true })).map(i => i.visible), [false, false]);
   assert.deepEqual(lib.filterItems(two, st({ unique: true })).map(i => i.visible), [true, true]);
 });
+
+test("fromApi: código de erro vira a frase traduzida do CRM", () => {
+  const texts = { "chat.errors.invalid-whatsapp-number": "Número não é WhatsApp.",
+                  "chat.errors.send-message-error": "Erro ao enviar: {message}" };
+  const it = lib.fromApi(log({ type: "error", errorCode: "chat.errors.invalid-whatsapp-number" }), texts);
+  assert.equal(it.errorMsg, "Número não é WhatsApp.");
+  assert.equal(it.status, "Erro – Número não é WhatsApp.");
+  assert.match(it.text, /chat\.errors\.invalid-whatsapp-number/); // busca pelo código continua
+  const p = lib.fromApi(log({ type: "error", errorCode: "chat.errors.send-message-error", errorParameters: { message: "timeout" } }), texts);
+  assert.equal(p.errorMsg, "Erro ao enviar: timeout");
+});
+
+test("fromApi: código sem tradução continua aparecendo", () => {
+  const it = lib.fromApi(log({ type: "error", errorCode: "x.errors.novo" }), {});
+  assert.equal(it.errorMsg, "");
+  assert.equal(it.status, "Erro – x.errors.novo");
+});

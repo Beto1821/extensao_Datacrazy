@@ -96,6 +96,7 @@ html.dark .dcf-bar input { color-scheme: dark; }
 .dcf-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dcf-time { flex: none; opacity: .6; font-variant-numeric: tabular-nums; font-size: 11px; }
 .dcf-sub { opacity: .7; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dcf-msg { font-size: 11px; line-height: 1.35; opacity: .85; }
 .dcf-l2 { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .dcf-phone { opacity: .75; font-variant-numeric: tabular-nums; margin-right: auto; }
 .dcf-pill, .dcf-rep {

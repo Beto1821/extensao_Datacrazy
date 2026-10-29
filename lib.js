@@ -40,17 +40,25 @@
     };
   }
 
-  // registro da API de logs -> log
-  function fromApi(r) {
+  // código de erro -> frase do CRM, com os {parâmetros} preenchidos ("" se não houver tradução)
+  function errorText(code, params, texts) {
+    const t = code && texts?.[code];
+    if (typeof t !== "string") return "";
+    return t.replace(/\{(\w+)\}/g, (m, k) => params?.[k] != null ? String(params[k]) : m);
+  }
+
+  // registro da API de logs -> log (texts: frases de erro traduzidas, do hook.js)
+  function fromApi(r, texts) {
     const date = new Date(r.createdAt);
-    const status = [TYPE_LABEL[r.type] || r.type || r.message || "", r.errorCode].filter(Boolean).join(" – ");
+    const errorMsg = errorText(r.errorCode, r.errorParameters, texts);
+    const status = [TYPE_LABEL[r.type] || r.type || r.message || "", errorMsg || r.errorCode].filter(Boolean).join(" – ");
     const lead = r.lead?.name?.trim() || "";
     const contact = (r.contactName || "").trim();
     const phone = r.contactId || "";
     return {
       id: `${r.flowSessionId}|${r.createdAt}`, sessionId: r.flowSessionId || "", date, dateText: fmtDate(date), status, lead, contact, phone,
-      type: r.type, errorCode: r.errorCode || "",
-      text: [fmtDate(date), status, lead, contact, phone, r.message].join(" ").toLowerCase()
+      type: r.type, errorCode: r.errorCode || "", errorMsg,
+      text: [fmtDate(date), status, r.errorCode, lead, contact, phone, r.message].join(" ").toLowerCase()
     };
   }
 
@@ -125,7 +133,7 @@
     return { name, phone };
   }
 
-  const lib = { DATE_RE, TYPE_LABEL, pad, fmtDate, escHtml, reqKey, parseLines, fromApi, filterItems,
+  const lib = { DATE_RE, TYPE_LABEL, pad, fmtDate, escHtml, reqKey, parseLines, errorText, fromApi, filterItems,
                 fmtPhone, hue, dayLabel, unwrap, personOf };
   if (typeof module === "object" && module.exports) module.exports = lib;
   else root.dcfLib = lib;
