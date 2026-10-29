@@ -67,7 +67,9 @@
     const p = origFetch.apply(this, arguments);
     try {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input?.url;
-      if (url && LOGS_RE.test(url)) {
+      // init.dcf: chamada da própria extensão (só acontece no CRM falso dos testes, onde o
+      // content.js roda no mundo da página); no Chrome ela usa o fetch do mundo isolado
+      if (url && LOGS_RE.test(url) && !init?.dcf) {
         const h = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
         // URL absoluta: o content.js monta outras rotas a partir dela
         const req = { url: new URL(url, location.href).href, headers: Object.fromEntries(h.entries()) };

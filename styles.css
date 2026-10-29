@@ -227,7 +227,11 @@ html.dark .dcf-bar input { color-scheme: dark; }
 .dcf-rp-fail { color: #dc2626; background: #ef444426; }
 .dcf-rp-wait { color: #2563eb; background: #3b82f626; }
 .dcf-chk { flex: none; align-self: center; margin: 0 -2px 0 0; cursor: pointer; }
-.dcf-bar button[data-a="stuck"].dcf-on { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+/* aba "Parados" (cópia da aba Erros): com ela aberta, a aba nativa ativa perde o sublinhado */
+[role="tablist"][data-dcf-stuck] > [role="tab"][data-state="active"]:not(.dcf-tab) {
+  border-bottom-width: 0 !important;
+  color: inherit !important;
+}
 .dcf-bar button[data-a="rpsel"]:not(:disabled) { background: #16a34a; border-color: #16a34a; color: #fff; }
 
 /* confirmação do reprocessar */

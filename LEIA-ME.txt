@@ -1,5 +1,5 @@
 ==============================================================
-  DATACRAZY - FILTRO DE LOGS DO BLOCO  (versão 1.10.0)
+  DATACRAZY - FILTRO DE LOGS DO BLOCO  (versão 1.11.0)
   Como instalar a extensão no Google Chrome
 
   © 2026 Adalberto Ribeiro - Time Tigers Datacrazy

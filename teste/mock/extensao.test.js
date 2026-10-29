@@ -173,6 +173,19 @@ test("▶ reprocessa a sessão a partir do bloco do log, depois de confirmar", c
   await p.locator('.dcf-confirm [data-a="ok"]').click();
   await p.locator(".dcf-rp-ok").waitFor();
   assert.deepEqual(crm.stats.reprocessCalls, [{ id: "s0", body: { reprocessFromBlockId: A }, type: "application/json" }]);
+  const salvo = JSON.parse(await p.evaluate(() => localStorage.getItem("dcf-reproc")));
+  assert.deepEqual(Object.keys(salvo), [`s0|${A}`]);
+}));
+
+test("tag reprocessado salva continua depois do F5, junto com as outras tags", comCrm({
+  logs: { [`${A}|warning`]: [log(A, "warning", 0, { lead: { name: "Maria Teste" }, contactId: "5511987654321" })] },
+  storage: { "dcf-reproc": JSON.stringify({ [`s0|${A}`]: Date.now() - 3600e3, [`s9|${A}`]: Date.now() - 8 * 864e5 }) }
+}, async crm => {
+  await crm.abrirBloco(A, "Alertas");
+  await crm.esperarLista();
+  const p = crm.page;
+  await p.locator('.dcf-item[data-sid="s0"] .dcf-rp-ok').waitFor();
+  assert.equal(await p.locator('.dcf-item[data-sid="s0"] .dcf-pill').innerText(), "! Alerta");
 }));
 
 test("▶ cancelado não chama a API", comCrm({
@@ -219,11 +232,49 @@ test("Parados: entrou sem sucesso nem erro; alerta ganha tag", comCrm({
   await crm.abrirBloco(A);
   await crm.esperarLista();
   const p = crm.page;
-  await p.locator('[data-a="stuck"]').click();
+  await p.locator(".dcf-tab").click();
   await p.waitForFunction(() => /parados/.test(document.querySelector(".dcf-count")?.textContent));
   assert.deepEqual((await crm.itens()).map(i => i.sid), ["s2", "s3"]);
   assert.equal(await crm.contador(), "Mostrando 2 de 2 parados");
   assert.equal(await p.locator('.dcf-item[data-sid="s3"] .dcf-rep').innerText(), "alerta");
+  // a aba Parados monta sobre Entraram: a aplicação trocou de aba e a cópia ficou ativa
+  assert.equal(await p.locator('[role="tab"][data-t="entered"]').getAttribute("data-state"), "active");
+  assert.equal(await p.locator(".dcf-tab").getAttribute("data-state"), "active");
+  assert.equal(await p.locator('[role="tablist"][data-dcf-stuck]').count(), 1);
+  // outra aba nativa fecha Parados
+  await crm.aba("Erros");
+  await p.waitForFunction(() => !/parados/.test(document.querySelector(".dcf-count")?.textContent || ""));
+  assert.equal(await p.locator(".dcf-tab").getAttribute("data-state"), "inactive");
+  assert.equal(await p.locator('[role="tablist"][data-dcf-stuck]').count(), 0);
+}));
+
+test("Parados com Entraram já aberta; clicar em Entraram volta à lista normal", comCrm({
+  logs: {
+    [`${A}|entered`]: [0, 1].map(i => parado(A, "entered", i, `Lead ${i}`)),
+    [`${A}|succeeded`]: [parado(A, "succeeded", 0, "Lead 0")]
+  }
+}, async crm => {
+  await crm.abrirBloco(A);
+  await crm.aba("Entraram");
+  await crm.esperarLista();
+  const p = crm.page;
+  await p.locator(".dcf-tab").click();
+  await p.waitForFunction(() => /parados/.test(document.querySelector(".dcf-count")?.textContent));
+  assert.deepEqual((await crm.itens()).map(i => i.sid), ["s1"]);
+  await p.locator('[role="tab"][data-t="entered"]').click();
+  await p.waitForFunction(() => /^Mostrando 2 de 2$/.test(document.querySelector(".dcf-count")?.textContent));
+  assert.equal(await p.locator(".dcf-tab").getAttribute("data-state"), "inactive");
+}));
+
+test("Clássico esconde a aba Parados", comCrm({
+  logs: { [`${A}|succeeded`]: [parado(A, "succeeded", 0, "Lead 0")] }
+}, async crm => {
+  await crm.abrirBloco(A);
+  await crm.esperarLista();
+  const p = crm.page;
+  assert.equal(await p.locator(".dcf-tab").isVisible(), true);
+  await p.locator('[data-m="classic"]').click();
+  assert.equal(await p.locator(".dcf-tab").isVisible(), false);
 }));
 
 test("Parados em bloco de Espera: quem ainda está no bloco ganha \"em espera\"", comCrm({
@@ -237,7 +288,7 @@ test("Parados em bloco de Espera: quem ainda está no bloco ganha \"em espera\""
   await crm.abrirBloco(E);
   await crm.esperarLista();
   const p = crm.page;
-  await p.locator('[data-a="stuck"]').click();
+  await p.locator(".dcf-tab").click();
   await p.locator('.dcf-item[data-sid="s0"] .dcf-rp-wait').waitFor();
   assert.equal(await p.locator('.dcf-item[data-sid="s1"] .dcf-rp-wait').count(), 0);
 }));

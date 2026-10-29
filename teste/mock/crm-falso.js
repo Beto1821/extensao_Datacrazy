@@ -46,8 +46,8 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CRM falso<
 </div>
 <div id="sheet" hidden>
   <div>Logs do bloco</div>
-  <div><span role="tab" data-t="entered">Entraram</span> <span role="tab" data-t="succeeded">Sucessos</span>
-       <span role="tab" data-t="warning">Alertas</span> <span role="tab" data-t="error">Erros</span></div>
+  <div role="tablist"><span role="tab" id="r-trigger-entered" data-t="entered">Entraram</span> <span role="tab" id="r-trigger-succeeded" data-t="succeeded">Sucessos</span>
+       <span role="tab" id="r-trigger-warning" data-t="warning">Alertas</span> <span role="tab" id="r-trigger-error" data-t="error">Erros</span></div>
   <div><div id="lista"></div></div>
 </div>
 <script>
@@ -58,7 +58,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CRM falso<
   async function open(b, t) {
     block = b; type = t; const my = ++seq;
     document.getElementById("sheet").hidden = false;
-    document.querySelectorAll("[role=tab]").forEach(x => x.setAttribute("aria-selected", x.dataset.t === t));
+    document.querySelectorAll("[role=tab]:not(.dcf-tab)").forEach(x => { x.setAttribute("aria-selected", x.dataset.t === t); x.setAttribute("data-state", x.dataset.t === t ? "active" : "inactive"); });
     const u = "/api/crm/flows/${FLOW}/versions/${VERSION}/logs?take=30&skip=0&filter%5BflowBlockId%5D=" + b + "&filter%5Btype%5D=" + t;
     const res = await window.fetch(u, { headers: { authorization: "Bearer token-teste", "x-signature": "${APP_SIG}", "x-dz-include-totals": "true" } });
     const json = await res.json();
@@ -68,12 +68,12 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CRM falso<
       (r.lead ? '<div>Lead:</div><div>' + r.lead.name + '</div>' : '') + '</div>').join("");
   }
   document.querySelectorAll(".react-flow__node b").forEach(e => e.onclick = () => open(e.closest(".react-flow__node").dataset.id, e.dataset.t));
-  document.querySelectorAll("[role=tab]").forEach(e => e.onclick = () => block && open(block, e.dataset.t));
+  document.querySelectorAll("[role=tab]").forEach(e => e.onclick = () => block && open(block, e.dataset.t)); // como no Radix, a cópia (sem onclick) não dispara
 </script></body></html>`;
 
 // cenário: { logs: { "bloco|tipo": [log...] }, sessions: { id: sessão }, pageCap, sessionDelay,
 //            sessionStatus(id, tentativa) -> status|undefined,
-//            reprocessStatus(id) -> status|undefined, logsStatus(skip, headers) -> status|undefined }
+//            reprocessStatus(id) -> status|undefined, storage: { chave: valor } no localStorage, logsStatus(skip, headers) -> status|undefined }
 async function abrir(cenario = {}) {
   const sc = { logs: {}, sessions: {}, pageCap: 93, sessionDelay: 0, ...cenario };
   const stats = { sessionCalls: {}, inFlight: 0, maxInFlight: 0, logsCalls: [], signatures: new Set(), reprocessCalls: [] };
@@ -125,6 +125,8 @@ async function abrir(cenario = {}) {
     return json(404, {});
   });
 
+  // localStorage de uma visita anterior (ex.: tags "reprocessado" salvas)
+  if (sc.storage) await page.addInitScript(st => { for (const [k, v] of Object.entries(st)) localStorage.setItem(k, v); }, sc.storage);
   // mesma ordem do manifest: hook.js antes da aplicação; lib.js, content.js e styles.css depois
   await page.addInitScript({ content: fs.readFileSync(path.join(ROOT, "hook.js"), "utf8") });
   await page.goto(`${ORIGIN}/flow/${FLOW}`);
