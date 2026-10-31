@@ -2,7 +2,7 @@
 
 Extensão para Google Chrome que adiciona uma barra de filtro na aba **Logs** do bloco do CRM Datacrazy (`https://crm.datacrazy.io`). Com ela você filtra os logs por nome, telefone, status e período, encontra contatos repetidos e baixa o resultado em planilha (CSV).
 
-Versão atual: **1.11.0**
+Versão atual: **1.12.0**
 
 Desenvolvido por **Adalberto Ribeiro** – Time Tigers Datacrazy.
 
@@ -96,7 +96,6 @@ A escolha fica salva no navegador. No modo Crazy, acima de cada lista de logs (E
 | **Só repetidos** | Mostra só os contatos que aparecem mais de uma vez. |
 | **Auto** | Ligado (padrão): ao abrir um bloco ou trocar de aba, a extensão já carrega o log inteiro sozinha. Desligue para carregar só quando clicar em **Carregar tudo**. A escolha fica salva. |
 | **Carregar tudo** | Busca o log inteiro do bloco direto no servidor do Datacrazy, em páginas de 200 (3 ao mesmo tempo), e mostra numa lista própria. Enquanto carrega, aparece um aviso com o número de logs já carregados (e o total, quando o Datacrazy informa) e um botão **Cancelar**. |
-| **Aba Parados** | Aba nova ao lado de **Erros** (só no modo Crazy). Mostra quem entrou no bloco e não tem log de sucesso nem de erro nele: a extensão abre a aba **Entraram** e cruza Entraram, Sucessos, Erros e Alertas pela sessão (um card por lead). Quem tem alerta nesse bloco ganha a tag **alerta**. Em bloco de **Espera**, quem ainda está esperando ganha a tag azul **em espera** (não está travado). Para sair, clique em qualquer outra aba (ou em **Entraram**, para a lista normal dela). |
 | **Baixar CSV** | Carrega o log inteiro sozinho e baixa um arquivo `.csv` com os logs que passam no filtro. **Sem filtro, baixa todo o log da aba selecionada.** |
 | **Limpar** | Remove todos os filtros. |
 
@@ -110,12 +109,13 @@ Outros detalhes:
 - **Nome e telefone em todos os blocos**: blocos antes do "Criar lead" (por exemplo, o Início com webhook) não trazem lead nem contato no log, e o bloco "Criar lead" traz o nome sem o telefone. Nesses logs a extensão busca os dados da sessão e mostra o nome e o telefone que chegaram no webhook. Os nomes aparecem aos poucos, logo depois da lista carregar. A busca, os filtros e o CSV também usam esses dados.
 - **Mensagem de erro traduzida**: na aba Erros, cada log mostra a mesma frase do modo Clássico (por exemplo, "O número de telefone do destinatário não é um número de WhatsApp válido..."), abaixo da etiqueta **✕ Erro**. O código original (`chat.errors.invalid-whatsapp-number`) aparece ao parar o mouse sobre a etiqueta. A busca acha pela frase ou pelo código, e o CSV leva a frase na coluna `status`.
 - **Reprocessar (▶)**: cada log com sessão tem um botão ▶, em todas as abas (Entraram, Sucessos, Alertas, Erros). Ele reprocessa a sessão daquele lead a partir do bloco aberto, igual ao ▶ do modo Clássico, um lead por vez. Antes de enviar, aparece uma confirmação com o nome do lead e do bloco. **Atenção:** o reprocesso é de verdade: mensagens desse bloco em diante são enviadas de novo. Depois do envio, o card ganha a tag verde **reprocessado** ou a vermelha **falhou: ...** (com o motivo; o ▶ volta a funcionar para tentar de novo). A tag **reprocessado** fica salva no navegador (localStorage) por 7 dias: continua no card depois de recarregar a lista ou a página (F5), junto com as outras tags. Parando o mouse sobre ela aparece a data e hora do reprocesso. Ela só marca o que foi reprocessado por esta extensão, neste navegador.
-- **Reprocessar vários de uma vez**: cada log tem uma caixinha. **Selecionar todos** marca os logs que passam no filtro. **Reprocessar selecionados (N)** pede confirmação e reprocessa um lead por vez a partir do bloco aberto; o botão mostra o progresso e um segundo clique cancela. No fim, o contador mostra quantos foram reprocessados e quantos falharam. Os que falharam continuam marcados para tentar de novo. A mesma sessão repetida no bloco é reprocessada uma vez só. Vale em todas as abas, inclusive **Parados**.
+- **Reprocessar vários de uma vez**: cada log tem uma caixinha. **Selecionar todos** marca os logs que passam no filtro. **Reprocessar selecionados (N)** pede confirmação e reprocessa um lead por vez a partir do bloco aberto; o botão mostra o progresso e um segundo clique cancela. No fim, o contador mostra quantos foram reprocessados e quantos falharam. Os que falharam continuam marcados para tentar de novo. A mesma sessão repetida no bloco é reprocessada uma vez só. Vale em todas as abas.
+- **Aviso de conexão desconectada**: em qualquer tela do CRM, se alguma conexão ligada (WhatsApp, Uazapi…) não estiver **Conectado**, aparece um aviso pequeno vermelho no canto de cima, abaixo do ícone da extensão (por exemplo, "1 conexão desconectada"). Clique nele para ver quais são, abrir a tela **Conexões** ou marcar **Ciente**. **Ciente** fecha o aviso até você abrir o CRM de novo (nova aba ou F5) ou até outra conexão cair. Conexão com a chave desligada não gera aviso. A extensão confere as conexões a cada 2 minutos (só com a aba visível) e na hora em que a tela Conexões é aberta.
 - **Ícone de banco de dados** no log: abre a inspeção da sessão, com os metadados, os parâmetros, os datasources e o histórico de blocos (nome, horário e tempo em cada bloco). Mostra em árvore ou JSON puro (**Raw**), e o botão **Copiar JSON** copia a seção aberta.
 
 ### Sobre o arquivo CSV
 
-- Nome do arquivo: `logs-<aba>-<data>_<hora>.csv` (`logs-parados-...` na lista de parados), salvo na pasta **Downloads**.
+- Nome do arquivo: `logs-<aba>-<data>_<hora>.csv`, salvo na pasta **Downloads**.
 - Colunas: `data;status;lead;contato;telefone`, separadas por `;`.
 - Abre direto no Excel com os acentos corretos. No Google Sheets, use **Arquivo > Importar** e escolha o separador `;`.
 - Sem data **De**, o CSV usa o período do seletor do próprio Datacrazy (por exemplo, "Última semana"). Para baixar logs mais antigos, preencha **De** com a data inicial.
@@ -131,6 +131,8 @@ Para os logs sem nome ou telefone, a extensão também chama `/api/crm/flow-sess
 O ▶ chama `POST /api/crm/flow-sessions/<sessão>/reprocess` com `{"reprocessFromBlockId": "<bloco>"}`, a mesma chamada do ▶ do Clássico. Ele não repete o pedido sozinho em caso de erro, para não enviar mensagem duas vezes.
 
 O log de erro traz só o código (por exemplo, `chat.errors.invalid-whatsapp-number`). A tradução vem do próprio Datacrazy: o `hook.js` lê as frases de erro que a página já carregou (as mesmas que o modo Clássico usa), sem nenhuma chamada a mais. Código sem tradução aparece como está.
+
+O aviso de conexão usa `GET /api/messaging/instances` no servidor de mensagens do CRM (por exemplo, `messaging.g1.datacrazy.io`), com o login das outras chamadas do Datacrazy que o `hook.js` observa. Conta como caída a conexão com `isActive` ligado e `status` diferente de `CONNECTED`.
 
 Se uma página demorar mais de 30 segundos, a extensão tenta de novo (até 3 vezes). Se mesmo assim falhar no meio, mostra o que já veio com o aviso **"incompleto"** no contador.
 
@@ -165,9 +167,9 @@ Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois,
 | Logs de março não aparecem quando a extensão rola a lista (busca direta falhou) | A versão 1.8.0 e as anteriores não reconheciam a data com "ç". Atualize para a 1.8.1 ou mais nova. |
 | Log aparece como "(sem lead)" ou sem telefone | Os nomes e telefones da sessão chegam aos poucos depois da lista carregar: espere alguns segundos. Se continuar, o webhook daquela sessão chegou sem nome e sem telefone (abra o ícone de banco de dados e veja **Datasources**). Precisa da versão 1.8.0 ou mais nova. |
 | Erro aparece só com o código (`chat.errors...`), sem a frase | Versão 1.8.1 e anteriores não traduziam. Atualize para a 1.8.2 ou mais nova. Se continuar, o Datacrazy ainda não tem tradução para esse código. |
-| Lead aparece em **Parados** mas já seguiu no fluxo | O log de sucesso dele pode estar fora do período (De/Até ou mais de 7 dias), ou o bloco registra a saída de outro jeito. Confira pelo ícone de banco de dados (**Histórico**) antes de reprocessar. Se a carga de alguma aba falhar, o contador mostra "incompleto": clique na aba **Parados** de novo. |
 | Tag **falhou: HTTP 4xx** depois do ▶ | O Datacrazy recusou o reprocesso daquela sessão. Clique no bloco de novo (para renovar o login da rota) e tente outra vez. Se continuar, teste o ▶ do modo Clássico no mesmo card: se ele também falhar, a sessão não pode ser reprocessada. |
 | O calendário de **De:** / **Até:** não abre | Versão 1.7.0 tinha esse erro. Atualize para a 1.7.1 ou mais nova (veja [Atualizar](#atualizar-para-uma-nova-versão)) e clique em recarregar no card da extensão. |
+| Aviso de conexão não aparece com conexão caída | O aviso só aparece depois que o CRM faz a primeira chamada com o seu login (alguns segundos depois de abrir). Confira na tela **Conexões** se a chave dela está ligada: chave desligada não gera aviso. Se você marcou **Ciente**, ele só volta com F5 ou com outra conexão caindo. |
 | O Chrome bloqueia o download | Permita downloads para `crm.datacrazy.io` nas configurações do Chrome. |
 | Aviso "Desativar extensões no modo desenvolvedor" ao abrir o Chrome | É normal para extensões instaladas por pasta. Feche o aviso (não clique em desativar). |
 
@@ -178,10 +180,10 @@ Abra `chrome://extensions` e clique em **Remover** no card da extensão. Depois,
 | Arquivo | Conteúdo |
 | ------- | -------- |
 | `manifest.json` | Configuração da extensão (nome, versão, site onde roda) |
-| `lib.js` | Funções sem tela e sem rede usadas pelo `content.js`: leitura dos logs e dos cards, filtro, formatação de telefone e data, nome e telefone da sessão. Os testes de unidade testam este arquivo |
-| `content.js` | Código que cria a barra, busca os logs, completa nome e telefone pela sessão, aplica os filtros, gera o CSV e abre a inspeção da sessão |
-| `hook.js` | Observa a chamada do Datacrazy à rota de logs, para a extensão reaproveitá-la, desenha o caminho da sessão nos blocos ao clicar num log e abre o calendário dos campos de data (roda no mundo da página, onde o `showPicker()` do Chrome funciona) |
-| `styles.css` | Estilo da barra, da lista, dos campos de data e do modal de inspeção |
+| `lib.js` | Funções sem tela e sem rede usadas pelo `content.js`: leitura dos logs e dos cards, filtro, formatação de telefone e data, nome e telefone da sessão, conexões caídas. Os testes de unidade testam este arquivo |
+| `content.js` | Código que cria a barra, busca os logs, completa nome e telefone pela sessão, aplica os filtros, gera o CSV, abre a inspeção da sessão e mostra o aviso de conexão desconectada |
+| `hook.js` | Observa a chamada do Datacrazy à rota de logs e o login das outras chamadas à API, para a extensão reaproveitá-los, desenha o caminho da sessão nos blocos ao clicar num log e abre o calendário dos campos de data (roda no mundo da página, onde o `showPicker()` do Chrome funciona) |
+| `styles.css` | Estilo da barra, da lista, dos campos de data, do modal de inspeção e do aviso de conexão |
 | `icons/` | Logo da extensão em 16, 32, 48 e 128 px (gerados a partir de `DC.png`) |
 | `DC.png` | Logo original em alta resolução (não vai no zip) |
 | `LEIA-ME.txt` | Instruções de instalação que vão no zip, na raiz e dentro da pasta da extensão (abre no Bloco de Notas) |

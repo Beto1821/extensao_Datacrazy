@@ -62,25 +62,6 @@
     };
   }
 
-  // "Parados": sessões que entraram no bloco e não têm log de sucesso nem de erro nele.
-  // Um card por sessão (a entrada mais recente); quem tem alerta ganha it.alert com a frase do alerta.
-  function stuckItems(entered, succeeded, errors, alerts = []) {
-    const out = new Set([...succeeded, ...errors].map(i => i.sessionId));
-    const alertOf = new Map(alerts.map(i => [i.sessionId, i]));
-    const seen = new Set(), res = [];
-    for (const it of [...entered].sort((a, b) => b.date - a.date)) {
-      if (!it.sessionId || out.has(it.sessionId) || seen.has(it.sessionId)) continue;
-      seen.add(it.sessionId);
-      const al = alertOf.get(it.sessionId);
-      res.push(al ? { ...it, alert: true, errorMsg: al.errorMsg, errorCode: al.errorCode } : { ...it });
-    }
-    return res;
-  }
-
-  // sessão ainda dentro do bloco (histórico sem horário de saída)
-  const stillIn = (details, blockId) =>
-    (details?.history || []).some(h => h.flowBlockId === blockId && !h.exitedDate);
-
   // marca it.visible e it.count em cada log, conforme o estado da barra
   function filterItems(items, state) {
     const terms = state.q.toLowerCase().split(",").map(s => s.trim()).filter(Boolean).map(t => ({
@@ -152,8 +133,21 @@
     return { name, phone };
   }
 
-  const lib = { DATE_RE, TYPE_LABEL, pad, fmtDate, escHtml, reqKey, parseLines, errorText, fromApi, stuckItems, stillIn, filterItems,
-                fmtPhone, hue, dayLabel, unwrap, personOf };
+  // conexões (rota /api/messaging/instances) ligadas e fora do ar; chave desligada é de propósito, não avisa
+  function downConns(list) {
+    return (Array.isArray(list) ? list : [])
+      .filter(i => i && i.id && !i.deletedAt && i.isActive !== false && i.status !== "CONNECTED")
+      .map(i => ({ id: i.id, name: String(i.name || "").trim() || "(sem nome)" }));
+  }
+
+  // servidor de mensagens do mesmo shard da chamada (crm.g1.datacrazy.io -> messaging.g1.datacrazy.io)
+  function messagingOrigin(url) {
+    const m = String(url || "").match(/^https:\/\/[a-z]+\.([a-z0-9-]+)\.datacrazy\.io\//);
+    return m ? `https://messaging.${m[1]}.datacrazy.io` : null;
+  }
+
+  const lib = { DATE_RE, TYPE_LABEL, pad, fmtDate, escHtml, reqKey, parseLines, errorText, fromApi, filterItems,
+                fmtPhone, hue, dayLabel, unwrap, personOf, downConns, messagingOrigin };
   if (typeof module === "object" && module.exports) module.exports = lib;
   else root.dcfLib = lib;
 })(globalThis);

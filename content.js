@@ -4,7 +4,8 @@
 // se a API falhar, caem para o modo antigo (rolar a lista até o fim).
 
 (() => {
-  const { DATE_RE, pad, fmtDate, escHtml, reqKey, parseLines, fromApi, stuckItems, stillIn, fmtPhone, hue, dayLabel, unwrap, personOf } = dcfLib;
+  const { DATE_RE, pad, fmtDate, escHtml, reqKey, parseLines, fromApi, fmtPhone, hue, dayLabel, unwrap, personOf,
+          downConns, messagingOrigin } = dcfLib;
   const PAGE_SIZE = 200;
   const REQUEST_TIMEOUT = 30000;
   const MAX_RENDER = 3000; // acima disso a lista na tela é cortada (o CSV leva tudo)
@@ -38,27 +39,22 @@
     try { localStorage.setItem(REPROC_KEY, JSON.stringify(o)); } catch {}
   }
   const picked = new Set();  // "sessão|bloco" marcados na caixinha, para reprocessar em lote
-  let stuckOn = false;       // aba "Parados" da extensão aberta
-  let pendingStuck = false;  // clicou em Parados e a aplicação está trocando para Entraram
-  let switching = false;     // clique sintético da extensão na aba Entraram
 
   // ---------- captura da rota (mensagens do hook.js) ----------
   window.addEventListener("message", e => {
     const d = e.data;
     if (e.source !== window || !d || d.source !== "dcf-hook") return;
     if (d.type === "error-texts") return void (errorTexts = d.texts || {});
+    if (d.type === "api-auth") return void gotAuth(d);
+    // lista incompleta (mais conexões que a página da aplicação) não serve: a extensão busca tudo
+    if (d.type === "instances") return void (d.count == null || d.data.length >= d.count ? setConns(d.data) : checkConns());
     if (d.type !== "logs-request") return;
     lastReq = { url: d.url, headers: d.headers };
     // outro bloco ou outra aba na aplicação: volta à lista nativa. Recargas do mesmo bloco/aba
     // (ex.: seletor "Última semana") não derrubam a lista carregada pela extensão.
     const key = reqKey(d.url);
     for (const [list, a] of api) if (a.key !== key) exitApi(list);
-    // Parados é montado sobre a aba Entraram; qualquer outra troca fecha a aba Parados
-    if (pendingStuck && new URL(d.url).searchParams.get("filter[type]") !== "entered") pendingStuck = false;
-    if (!pendingStuck && ![...api.values()].some(a => a.key === key && a.stuck)) stuckOn = false;
-    syncStuckTab();
-    if (pendingStuck) pendingAuto = null;
-    else if (auto && mode === "crazy" && ![...api.values()].some(a => a.key === key)) pendingAuto = key;
+    if (auto && mode === "crazy" && ![...api.values()].some(a => a.key === key)) pendingAuto = key;
     clearTimeout(t);
     t = setTimeout(scan, 300); // a lista pode já estar na tela (e cards sem Lead só valem agora)
   });
@@ -156,12 +152,10 @@
 
   // busca todas as páginas da mesma rota que a aplicação usa, com páginas maiores e em paralelo
   // onProgress(carregados, total|null); cancelled() = usuário clicou em Cancelar
-  // type: outra aba do mesmo bloco (ex.: "entered"); sem type, a aba aberta
-  async function fetchAllLogs(onProgress, cancelled, type) {
+  async function fetchAllLogs(onProgress, cancelled) {
     if (!lastReq) throw new Error("rota de logs ainda não capturada");
     const base = new URL(lastReq.url);
     base.searchParams.set("take", PAGE_SIZE);
-    if (type) base.searchParams.set("filter[type]", type);
     if (state.from) base.searchParams.set("filter[createdAtGreaterOrEqual]", new Date(state.from).toISOString());
     if (state.to) base.searchParams.set("filter[createdAtLessOrEqual]", new Date(state.to).toISOString());
     const headers = { ...lastReq.headers };
@@ -262,8 +256,6 @@
       : rp?.st === "fail" ? `<span class="dcf-rp dcf-rp-fail">falhou: ${escHtml(rp.msg)}</span>` : "";
     const chk = it.sessionId && it.blockId
       ? `<input type="checkbox" class="dcf-chk" title="Selecionar para reprocessar"${picked.has(`${it.sessionId}|${it.blockId}`) ? " checked" : ""}>` : "";
-    const stuckTags = (it.waiting ? `<span class="dcf-rp dcf-rp-wait">em espera</span>` : "")
-      + (it.alert ? `<span class="dcf-rep">alerta</span>` : "");
     return `
       <div class="dcf-item dcf-k-${kind}${it.sessionId && it.sessionId === selSession ? " dcf-sel" : ""}" data-sid="${escHtml(it.sessionId)}" data-id="${escHtml(it.id)}">
         ${chk}<div class="dcf-av" style="--h:${hue(name)}">${escHtml((name.match(/[\p{L}\d]/u) || ["?"])[0].toUpperCase())}</div>
@@ -274,7 +266,7 @@
             ${it.phone ? `<span class="dcf-phone">${escHtml(fmtPhone(it.phone))}</span>` : ""}
             <span class="dcf-pill"${it.errorCode ? ` title="${escHtml(it.errorCode)}"` : ""}>${escHtml(label)}${it.errorCode && !it.errorMsg ? ` · ${escHtml(it.errorCode)}` : ""}</span>
             ${it.count > 1 ? `<span class="dcf-rep">repetido ${it.count}x</span>` : ""}
-            ${stuckTags}${rpTag}
+            ${rpTag}
           </div>
           ${it.errorMsg ? `<div class="dcf-msg">${escHtml(it.errorMsg)}</div>` : ""}
         </div>
@@ -298,7 +290,7 @@
       html += itemHtml(it);
     }
     a.view.innerHTML = html || `<div class="dcf-empty">Nenhum log no filtro.</div>`;
-    setCount(list, vis.length, items.length, (a.stuck ? " parados" : "") +
+    setCount(list, vis.length, items.length,
       (vis.length > MAX_RENDER ? ` (tela: ${MAX_RENDER})` : "") + (a.error ? ` – incompleto: ${a.error}` : ""));
     return items;
   }
@@ -329,38 +321,12 @@
   // nome e telefone estão nos parâmetros/datasources da sessão (um pedido por sessão, com cache)
   const SESSION_PARALLEL = 6;
   const people = new Map(); // sessionId -> Promise<{ name, phone }>
-  const details = new Map(); // sessionId -> Promise<detalhes|null> (aba Parados: a sessão ainda está no bloco?)
 
   function sessionDetails(id) {
     if (!lastReq) return Promise.reject(new Error("rota de logs ainda não capturada"));
     const headers = { ...lastReq.headers };
     delete headers["x-dz-include-totals"];
     return getJson(`${new URL(lastReq.url).origin}/api/crm/flow-sessions/${encodeURIComponent(id)}/details`, headers);
-  }
-
-  function fetchDetails(id) {
-    if (!details.has(id))
-      details.set(id, sessionDetails(id).catch(err => {
-        details.delete(id);
-        console.warn(`[Filtro de Logs] sessão ${id}:`, err.message);
-        return null;
-      }));
-    return details.get(id);
-  }
-
-  // Parados em bloco de Espera: quem ainda está no bloco ganha a tag "em espera"
-  async function markWaiting(list) {
-    const a = api.get(list);
-    if (!a?.stuck || !/espera/i.test(blockName(a.blockId))) return;
-    let i = 0, timer;
-    const redraw = () => { clearTimeout(timer); timer = setTimeout(() => api.get(list) === a && apply(list), 250); };
-    const worker = async () => {
-      while (i < a.items.length && api.get(list) === a) {
-        const it = a.items[i++];
-        if (stillIn(await fetchDetails(it.sessionId), it.blockId)) { it.waiting = true; it.text += " em espera"; redraw(); }
-      }
-    };
-    await Promise.all(Array.from({ length: SESSION_PARALLEL }, worker));
   }
 
   function fetchPerson(id) {
@@ -755,42 +721,6 @@
     return apply(list);
   }
 
-  // aba "Parados" da extensão: Entraram menos (Sucessos + Erros) do bloco aberto, cruzando pela sessão
-  async function loadStuck(list) {
-    if (mode === "classic" || !lastReq) return [];
-    const my = ++loadSeq;
-    let userCancel = false;
-    const cancelled = () => userCancel || my !== loadSeq;
-    list.classList.add("dcf-native-off");
-    api.get(list)?.view.classList.add("dcf-native-off");
-    const loading = showLoading(list, () => { userCancel = true; });
-    const TYPES = [["entered", "Entraram"], ["succeeded", "Sucessos"], ["error", "Erros"], ["warning", "Alertas"]];
-    const got = {};
-    let err = "";
-    try {
-      for (const [type, label] of TYPES) {
-        loading.update(0, null);
-        const data = await fetchAllLogs((n, total) => !cancelled() && loading.update(n, total), cancelled, type);
-        if (cancelled()) break;
-        got[type] = data;
-        if (data.error) err = `${label}: ${data.error}`; // faltou parte: a lista pode trazer quem não está parado
-      }
-      if (!cancelled()) {
-        const blockId = new URL(lastReq.url).searchParams.get("filter[flowBlockId]") || "";
-        const items = stuckItems(got.entered.items, got.succeeded.items, got.error.items, got.warning.items);
-        enterApi(list, { items, from: state.from, to: state.to, key: reqKey(lastReq.url), error: err, stuck: true, blockId });
-        markWaiting(list);
-      }
-    } catch (e) {
-      if (!cancelled()) { setCount(list, 0, 0, ` – não foi possível montar os parados: ${e.message}`); stuckOn = false; syncStuckTab(); }
-      if (!api.has(list)) list.classList.remove("dcf-native-off");
-    }
-    if (cancelled() && my === loadSeq) { stuckOn = false; syncStuckTab(); } // Cancelar no aviso de carga
-    loading.remove();
-    api.get(list)?.view.classList.remove("dcf-native-off");
-    return api.has(list) ? apply(list) : [];
-  }
-
   function tabName() {
     const tab = document.querySelector('[role="tab"][aria-selected="true"], [role="tab"][data-state="active"]');
     return (tab?.innerText || "logs").trim().toLowerCase().normalize("NFD").replace(/[^\w]+/g, "-");
@@ -799,7 +729,7 @@
   // baixa as linhas que passam no filtro (sem filtro = todas)
   async function downloadCsv(list, btn) {
     const a = api.get(list);
-    const fresh = a && ((a.from === state.from && a.to === state.to && !a.error) || a.stuck);
+    const fresh = a && (a.from === state.from && a.to === state.to && !a.error);
     const rows = (fresh ? apply(list) : await loadEverything(list, bars.get(list).querySelector('[data-a="load"]')))
       .filter(i => i.visible);
     btn.disabled = true;
@@ -809,7 +739,7 @@
     const d = new Date();
     const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
     const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" })); // BOM = acentos certos no Excel
-    const link = Object.assign(document.createElement("a"), { href: url, download: `logs-${a?.stuck ? "parados" : tabName()}-${stamp}.csv` });
+    const link = Object.assign(document.createElement("a"), { href: url, download: `logs-${tabName()}-${stamp}.csv` });
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -862,9 +792,7 @@
         // período mudou com dados da API na tela: busca de novo com o novo período
         if ((k === "from" || k === "to") && api.has(list)) {
           clearTimeout(refetchTimer);
-          refetchTimer = setTimeout(() => api.get(list)?.stuck
-            ? loadStuck(list)
-            : loadEverything(list, bar.querySelector('[data-a="load"]')), 800);
+          refetchTimer = setTimeout(() => loadEverything(list, bar.querySelector('[data-a="load"]')), 800);
         }
       });
     });
@@ -941,69 +869,6 @@
     });
   }
 
-  // ---------- aba "Parados" ao lado de Erros ----------
-  // cópia da aba Erros (Radix): mesmo visual, sem os eventos do React. Parados é um pedaço de Entraram,
-  // então a lista é montada na aba Entraram; a aba nativa ativa perde o sublinhado pelo CSS.
-  const nativeTab = (tablist, type, label) =>
-    tablist.querySelector(`[role="tab"][id$="-trigger-${type}"]`)
-    || [...tablist.querySelectorAll('[role="tab"]:not(.dcf-tab)')].find(t => t.textContent.trim() === label);
-
-  function addStuckTab() {
-    for (const tl of document.querySelectorAll('[role="tablist"]')) {
-      const err = nativeTab(tl, "error", "Erros");
-      if (!err || tl.querySelector(".dcf-tab")) continue;
-      const tab = err.cloneNode(true);
-      tab.classList.add("dcf-tab");
-      ["id", "aria-controls", "data-radix-collection-item", "data-t"].forEach(a => tab.removeAttribute(a));
-      tab.setAttribute("title", "Quem entrou neste bloco e não tem sucesso nem erro");
-      (tab.querySelector("div") || tab).textContent = "Parados";
-      tab.addEventListener("click", e => { e.stopPropagation(); openStuck(tl); });
-      tl.appendChild(tab);
-      // clique numa aba nativa fecha Parados; na mesma aba que já estava ativa, volta à lista normal dela
-      let wasActive = false;
-      tl.addEventListener("pointerdown", e => {
-        const t = e.target.closest('[role="tab"]:not(.dcf-tab)');
-        wasActive = !!t && t.getAttribute("data-state") === "active";
-      }, true);
-      tl.addEventListener("click", e => {
-        if (switching || !e.target.closest('[role="tab"]:not(.dcf-tab)') || !stuckOn) return;
-        stuckOn = pendingStuck = false;
-        syncStuckTab();
-        const list = [...api].find(([, a]) => a.stuck)?.[0];
-        if (wasActive && list) loadEverything(list, bars.get(list).querySelector('[data-a="load"]'));
-      });
-    }
-    syncStuckTab();
-  }
-
-  function syncStuckTab() {
-    for (const tab of document.querySelectorAll(".dcf-tab")) {
-      const on = stuckOn && mode === "crazy";
-      tab.hidden = mode === "classic";
-      tab.setAttribute("data-state", on ? "active" : "inactive");
-      tab.setAttribute("aria-selected", on);
-      tab.parentElement.toggleAttribute("data-dcf-stuck", on);
-    }
-  }
-
-  function openStuck(tablist) {
-    if (mode === "classic" || !lastReq) return;
-    stuckOn = true;
-    syncStuckTab();
-    const entered = nativeTab(tablist, "entered", "Entraram");
-    if (entered && entered.getAttribute("data-state") !== "active" && entered.getAttribute("aria-selected") !== "true") {
-      pendingStuck = true; // a lista abre quando a aplicação mostrar Entraram (scan)
-      switching = true; // este clique é nosso: não fecha Parados
-      for (const ev of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"])
-        entered.dispatchEvent(new MouseEvent(ev, { bubbles: true, cancelable: true, button: 0 }));
-      switching = false;
-      return;
-    }
-    // com a lista da extensão na tela, a nativa fica escondida: olha a que estiver à mostra
-    const list = [...bars.keys()].find(l => (api.get(l)?.view || l).offsetParent !== null);
-    if (list) loadStuck(list);
-  }
-
   // ---------- seletor Clássico / Crazy ----------
   function makeToggle() {
     const el = document.createElement("div");
@@ -1023,8 +888,6 @@
       bar.classList.toggle("dcf-off", m === "classic");
       apply(list);
     }
-    if (m === "classic") stuckOn = pendingStuck = false;
-    syncStuckTab();
     updateToggles();
     // voltou ao Crazy com o automático ligado: carrega a lista visível
     if (m === "crazy" && auto && lastReq) pendingAuto = reqKey(lastReq.url);
@@ -1057,11 +920,6 @@
       }
       if (!api.has(list)) apply(list); // lista da API só muda com filtro, não com o DOM da página
     }
-    addStuckTab();
-    if (pendingStuck && lastReq && new URL(lastReq.url).searchParams.get("filter[type]") === "entered") {
-      const visible = [...lists].find(l => l.offsetParent !== null);
-      if (visible) { pendingStuck = false; loadStuck(visible); }
-    }
     // abriu bloco/aba novo com o automático ligado: carrega tudo na lista que está visível
     if (pendingAuto && lastReq && reqKey(lastReq.url) === pendingAuto) {
       const visible = [...lists].find(l => l.offsetParent !== null && !api.has(l));
@@ -1072,9 +930,93 @@
     }
   }
 
+  // ---------- aviso de conexão desconectada ----------
+  // Banner pequeno no canto de cima, abaixo do ícone da extensão. "Ciente" fecha até a página do CRM
+  // ser aberta de novo ou outra conexão cair (a lista de cientes fica só na memória da aba).
+  const CONN_EVERY = 120e3;
+  let connAuth = null;      // { origin, headers } para a rota de conexões
+  let conns = [];           // conexões ligadas e fora do ar [{ id, name }]
+  const connAck = new Set(); // ids que o usuário já viu (Ciente)
+  let connAt = 0, connBusy = false, connBox = null;
+
+  function gotAuth(d) {
+    const origin = messagingOrigin(d.url);
+    if (!origin) return;
+    const first = !connAuth;
+    connAuth = { origin, headers: d.headers };
+    if (first) checkConns();
+  }
+
+  async function checkConns() {
+    if (!connAuth || connBusy) return;
+    connBusy = true;
+    connAt = Date.now();
+    try {
+      const all = [];
+      for (let skip = 0; ; skip += 100) {
+        const u = `${connAuth.origin}/api/messaging/instances?take=100&skip=${skip}&filter%5BbypassAttendantPermission%5D=true`;
+        const j = await getJson(u, { ...connAuth.headers, "x-dz-include-totals": "true" });
+        const page = Array.isArray(j?.data) ? j.data : [];
+        all.push(...page);
+        if (page.length < 100 || all.length >= (j.count ?? 0)) break;
+      }
+      setConns(all);
+    } catch (e) {
+      console.warn("[Filtro de Logs] não consegui ler as conexões:", e.message);
+    } finally {
+      connBusy = false;
+    }
+  }
+  setInterval(() => { if (!document.hidden) checkConns(); }, CONN_EVERY);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && Date.now() - connAt > CONN_EVERY) checkConns();
+  });
+
+  function setConns(list) {
+    conns = downConns(list);
+    // voltou a conectar: se cair de novo, avisa de novo
+    const ids = new Set(conns.map(c => c.id));
+    for (const id of connAck) if (!ids.has(id)) connAck.delete(id);
+    renderConns();
+  }
+
+  function renderConns() {
+    if (!conns.some(c => !connAck.has(c.id))) return void connBox?.remove();
+    if (!connBox) {
+      connBox = document.createElement("div");
+      connBox.className = "dcf-conn";
+      connBox.setAttribute("role", "alert");
+      connBox.addEventListener("click", e => {
+        const a = e.target.closest("[data-a]")?.dataset.a;
+        if (a === "toggle") setConnMenu(connBox.querySelector(".dcf-conn-menu").hidden);
+        if (a === "ack") { for (const c of conns) connAck.add(c.id); setConnMenu(false); renderConns(); }
+      });
+    }
+    const n = conns.length;
+    const open = connBox.querySelector(".dcf-conn-menu")?.hidden === false;
+    connBox.innerHTML = `
+      <button type="button" class="dcf-conn-btn" data-a="toggle" aria-expanded="${open}" title="Ver conexões">
+        <span class="dcf-conn-dot"></span>${n} ${n === 1 ? "conexão desconectada" : "conexões desconectadas"}<span class="dcf-conn-caret">▾</span>
+      </button>
+      <div class="dcf-conn-menu" ${open ? "" : "hidden"}>
+        <ul>${conns.map(c => `<li${connAck.has(c.id) ? "" : ' class="dcf-conn-new"'}>${escHtml(c.name)}</li>`).join("")}</ul>
+        <a href="/config/instances">Abrir Conexões</a>
+        <button type="button" data-a="ack">Ciente</button>
+      </div>`;
+    if (!connBox.isConnected) document.body.appendChild(connBox);
+  }
+
+  function setConnMenu(open) {
+    if (!connBox) return;
+    connBox.querySelector(".dcf-conn-menu").hidden = !open;
+    connBox.querySelector(".dcf-conn-btn").setAttribute("aria-expanded", open);
+  }
+  document.addEventListener("click", e => { if (connBox && !connBox.contains(e.target)) setConnMenu(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") setConnMenu(false); });
+
   let t;
   new MutationObserver(muts => {
-    if (muts.every(m => m.target.closest?.(".dcf-bar, .dcf-list, .dcf-mode, .dcf-modal-bg"))) return;
+    if (muts.every(m => m.target.closest?.(".dcf-bar, .dcf-list, .dcf-mode, .dcf-modal-bg, .dcf-conn"))) return;
     clearTimeout(t);
     t = setTimeout(scan, 300);
   }).observe(document.body, { childList: true, subtree: true });

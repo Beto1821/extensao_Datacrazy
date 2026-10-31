@@ -168,17 +168,17 @@ test("fromApi: código sem tradução continua aparecendo", () => {
   assert.equal(it.status, "Erro – x.errors.novo");
 });
 
-test("stuckItems: entrou sem sucesso nem erro, um card por sessão, alerta marcado", () => {
-  const e = (sid, min, over = {}) => ({ sessionId: sid, date: new Date(2026, 9, 27, 10, min), ...over });
-  const res = lib.stuckItems(
-    [e("a", 1), e("a", 5), e("b", 2), e("c", 3), e("d", 4), e("", 6)],
-    [e("b", 3)], [e("c", 4)], [e("d", 5, { errorMsg: "Alerta X", errorCode: "x.errors.y" })]);
-  assert.deepEqual(res.map(i => [i.sessionId, i.date.getMinutes(), !!i.alert]), [["a", 5, false], ["d", 4, true]]);
-  assert.equal(res[1].errorMsg, "Alerta X");
+test("downConns: só conexão ligada e fora do ar", () => {
+  const c = (id, status, over = {}) => ({ id, name: `C ${id}`, status, isActive: true, deletedAt: null, ...over });
+  assert.deepEqual(lib.downConns([
+    c("1", "CONNECTED"), c("2", "DISCONNECTED"), c("3", "DISCONNECTED", { isActive: false }),
+    c("4", "DISCONNECTED", { deletedAt: "2026-10-30T00:00:00Z" }), c("5", "CONNECTING", { name: "  " })
+  ]), [{ id: "2", name: "C 2" }, { id: "5", name: "(sem nome)" }]);
+  assert.deepEqual(lib.downConns(null), []);
 });
 
-test("stillIn: sessão sem horário de saída do bloco", () => {
-  assert.equal(lib.stillIn({ history: [{ flowBlockId: "b1", exitedDate: null }] }, "b1"), true);
-  assert.equal(lib.stillIn({ history: [{ flowBlockId: "b1", exitedDate: "2026-10-27" }] }, "b1"), false);
-  assert.equal(lib.stillIn(null, "b1"), false);
+test("messagingOrigin: mesmo shard da chamada", () => {
+  assert.equal(lib.messagingOrigin("https://crm.g1.datacrazy.io/api/crm/sync"), "https://messaging.g1.datacrazy.io");
+  assert.equal(lib.messagingOrigin("https://accounts.g2.datacrazy.io/api/x"), "https://messaging.g2.datacrazy.io");
+  assert.equal(lib.messagingOrigin("https://crm.datacrazy.io/api/track"), null);
 });

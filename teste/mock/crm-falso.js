@@ -1,12 +1,13 @@
 // CRM falso para os testes ponta a ponta: uma página parecida com o editor de flow do Datacrazy
 // (blocos, painel de logs com abas e cards nativos) e uma API falsa de logs e sessões.
-// Nada sai para a internet: o Playwright responde todas as chamadas a crm.datacrazy.io.
+// Nada sai para a internet: o Playwright responde todas as chamadas a crm.datacrazy.io e *.g1.datacrazy.io.
 const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright");
 
 const ROOT = path.join(__dirname, "..", "..");
 const ORIGIN = "https://crm.datacrazy.io";
+const SHARD = "https://*.g1.datacrazy.io"; // servidores da API (accounts.g1, messaging.g1…)
 const FLOW = "flow-teste", VERSION = "versao-teste";
 const APP_SIG = "sig-da-aplicacao"; // assinatura que a "aplicação" manda; o cenário pode recusá-la
 
@@ -41,8 +42,6 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CRM falso<
     <b data-t="succeeded">Sucessos</b><b data-t="warning">Alertas</b><b data-t="error">Erros</b></div>
   <div class="react-flow__node" data-id="bloco-acao"><span class="text-base font-semibold">Ação</span><br>
     <b data-t="succeeded">Sucessos</b><b data-t="warning">Alertas</b><b data-t="error">Erros</b></div>
-  <div class="react-flow__node" data-id="bloco-espera"><span class="text-base font-semibold">Espera</span><br>
-    <b data-t="succeeded">Sucessos</b><b data-t="warning">Alertas</b><b data-t="error">Erros</b></div>
 </div>
 <div id="sheet" hidden>
   <div>Logs do bloco</div>
@@ -58,7 +57,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CRM falso<
   async function open(b, t) {
     block = b; type = t; const my = ++seq;
     document.getElementById("sheet").hidden = false;
-    document.querySelectorAll("[role=tab]:not(.dcf-tab)").forEach(x => { x.setAttribute("aria-selected", x.dataset.t === t); x.setAttribute("data-state", x.dataset.t === t ? "active" : "inactive"); });
+    document.querySelectorAll("[role=tab]").forEach(x => { x.setAttribute("aria-selected", x.dataset.t === t); x.setAttribute("data-state", x.dataset.t === t ? "active" : "inactive"); });
     const u = "/api/crm/flows/${FLOW}/versions/${VERSION}/logs?take=30&skip=0&filter%5BflowBlockId%5D=" + b + "&filter%5Btype%5D=" + t;
     const res = await window.fetch(u, { headers: { authorization: "Bearer token-teste", "x-signature": "${APP_SIG}", "x-dz-include-totals": "true" } });
     const json = await res.json();
@@ -67,16 +66,18 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CRM falso<
       '<div class="cursor-pointer rounded-lg"><div>' + dataPt(new Date(r.createdAt)) + '</div><div>' + r.type + '</div>' +
       (r.lead ? '<div>Lead:</div><div>' + r.lead.name + '</div>' : '') + '</div>').join("");
   }
+  // como o CRM ao abrir: chamada autenticada ao servidor de contas
+  window.fetch("https://accounts.g1.datacrazy.io/api/accounts/users/current-user", { headers: { authorization: "Bearer token-teste", "x-signature": "${APP_SIG}" } });
   document.querySelectorAll(".react-flow__node b").forEach(e => e.onclick = () => open(e.closest(".react-flow__node").dataset.id, e.dataset.t));
-  document.querySelectorAll("[role=tab]").forEach(e => e.onclick = () => block && open(block, e.dataset.t)); // como no Radix, a cópia (sem onclick) não dispara
+  document.querySelectorAll("[role=tab]").forEach(e => e.onclick = () => block && open(block, e.dataset.t));
 </script></body></html>`;
 
 // cenário: { logs: { "bloco|tipo": [log...] }, sessions: { id: sessão }, pageCap, sessionDelay,
 //            sessionStatus(id, tentativa) -> status|undefined,
-//            reprocessStatus(id) -> status|undefined, storage: { chave: valor } no localStorage, logsStatus(skip, headers) -> status|undefined }
+//            reprocessStatus(id) -> status|undefined, instances: [conexão...] (rota /api/messaging/instances), storage: { chave: valor } no localStorage, logsStatus(skip, headers) -> status|undefined }
 async function abrir(cenario = {}) {
-  const sc = { logs: {}, sessions: {}, pageCap: 93, sessionDelay: 0, ...cenario };
-  const stats = { sessionCalls: {}, inFlight: 0, maxInFlight: 0, logsCalls: [], signatures: new Set(), reprocessCalls: [] };
+  const sc = { logs: {}, sessions: {}, pageCap: 93, sessionDelay: 0, instances: [], ...cenario };
+  const stats = { sessionCalls: {}, inFlight: 0, maxInFlight: 0, logsCalls: [], signatures: new Set(), reprocessCalls: [], instancesCalls: [] };
   const exe = process.env.CHROMIUM_PATH || undefined;
   const browser = await chromium.launch({ headless: process.env.HEADED ? false : true, executablePath: exe });
   const context = await browser.newContext({ acceptDownloads: true, timezoneId: "America/Sao_Paulo", locale: "pt-BR" });
@@ -122,6 +123,19 @@ async function abrir(cenario = {}) {
       const all = sc.logs[`${q.get("filter[flowBlockId]")}|${q.get("filter[type]")}`] || [];
       return json(200, { count: all.length, data: all.slice(skip, skip + take) });
     }
+    return json(404, {});
+  });
+
+  await page.route(`${SHARD}/**`, route => {
+    const req = route.request(), u = new URL(req.url());
+    const json = (status, body) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body),
+      headers: { "access-control-allow-origin": ORIGIN, "access-control-allow-headers": "*" } });
+    if (u.hostname === "messaging.g1.datacrazy.io" && u.pathname === "/api/messaging/instances") {
+      stats.instancesCalls.push({ auth: req.headers().authorization, take: +u.searchParams.get("take") });
+      const skip = +u.searchParams.get("skip") || 0, take = +u.searchParams.get("take") || 50;
+      return json(200, { count: sc.instances.length, data: sc.instances.slice(skip, skip + take) });
+    }
+    if (u.pathname === "/api/accounts/users/current-user") return json(200, { id: "u1" });
     return json(404, {});
   });
 

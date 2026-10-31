@@ -218,83 +218,19 @@ test("▶ com erro mostra a falha no card e libera o botão", comCrm({
   assert.equal(crm.stats.reprocessCalls.length, 1, "erro 400 não repete o pedido");
 }));
 
-const E = "bloco-espera";
-const parado = (block, type, i, name) => log(block, type, i, { lead: { name }, contactId: `551190000000${i}` });
+// log com nome e telefone: não busca a sessão
+const comLead = (block, type, i, name) => log(block, type, i, { lead: { name }, contactId: `551190000000${i}` });
 
-test("Parados: entrou sem sucesso nem erro; alerta ganha tag", comCrm({
-  logs: {
-    [`${A}|entered`]: [0, 1, 2, 3].map(i => parado(A, "entered", i, `Lead ${i}`)),
-    [`${A}|succeeded`]: [parado(A, "succeeded", 0, "Lead 0")],
-    [`${A}|error`]: [parado(A, "error", 1, "Lead 1")],
-    [`${A}|warning`]: [parado(A, "warning", 3, "Lead 3")]
-  }
+test("sem aba Parados ao lado de Erros", comCrm({
+  logs: { [`${A}|succeeded`]: [comLead(A, "succeeded", 0, "Lead 0")] }
 }, async crm => {
   await crm.abrirBloco(A);
   await crm.esperarLista();
-  const p = crm.page;
-  await p.locator(".dcf-tab").click();
-  await p.waitForFunction(() => /parados/.test(document.querySelector(".dcf-count")?.textContent));
-  assert.deepEqual((await crm.itens()).map(i => i.sid), ["s2", "s3"]);
-  assert.equal(await crm.contador(), "Mostrando 2 de 2 parados");
-  assert.equal(await p.locator('.dcf-item[data-sid="s3"] .dcf-rep').innerText(), "alerta");
-  // a aba Parados monta sobre Entraram: a aplicação trocou de aba e a cópia ficou ativa
-  assert.equal(await p.locator('[role="tab"][data-t="entered"]').getAttribute("data-state"), "active");
-  assert.equal(await p.locator(".dcf-tab").getAttribute("data-state"), "active");
-  assert.equal(await p.locator('[role="tablist"][data-dcf-stuck]').count(), 1);
-  // outra aba nativa fecha Parados
-  await crm.aba("Erros");
-  await p.waitForFunction(() => !/parados/.test(document.querySelector(".dcf-count")?.textContent || ""));
-  assert.equal(await p.locator(".dcf-tab").getAttribute("data-state"), "inactive");
-  assert.equal(await p.locator('[role="tablist"][data-dcf-stuck]').count(), 0);
-}));
-
-test("Parados com Entraram já aberta; clicar em Entraram volta à lista normal", comCrm({
-  logs: {
-    [`${A}|entered`]: [0, 1].map(i => parado(A, "entered", i, `Lead ${i}`)),
-    [`${A}|succeeded`]: [parado(A, "succeeded", 0, "Lead 0")]
-  }
-}, async crm => {
-  await crm.abrirBloco(A);
-  await crm.aba("Entraram");
-  await crm.esperarLista();
-  const p = crm.page;
-  await p.locator(".dcf-tab").click();
-  await p.waitForFunction(() => /parados/.test(document.querySelector(".dcf-count")?.textContent));
-  assert.deepEqual((await crm.itens()).map(i => i.sid), ["s1"]);
-  await p.locator('[role="tab"][data-t="entered"]').click();
-  await p.waitForFunction(() => /^Mostrando 2 de 2$/.test(document.querySelector(".dcf-count")?.textContent));
-  assert.equal(await p.locator(".dcf-tab").getAttribute("data-state"), "inactive");
-}));
-
-test("Clássico esconde a aba Parados", comCrm({
-  logs: { [`${A}|succeeded`]: [parado(A, "succeeded", 0, "Lead 0")] }
-}, async crm => {
-  await crm.abrirBloco(A);
-  await crm.esperarLista();
-  const p = crm.page;
-  assert.equal(await p.locator(".dcf-tab").isVisible(), true);
-  await p.locator('[data-m="classic"]').click();
-  assert.equal(await p.locator(".dcf-tab").isVisible(), false);
-}));
-
-test("Parados em bloco de Espera: quem ainda está no bloco ganha \"em espera\"", comCrm({
-  logs: { [`${E}|entered`]: [0, 1].map(i => parado(E, "entered", i, `Lead ${i}`)),
-          [`${E}|succeeded`]: [parado(E, "succeeded", 5, "Lead 5")] }, // sem card nenhum a barra não aparece
-  sessions: {
-    s0: { ...session("s0", "Lead 0", "1"), history: [{ flowBlockId: E, enteredDate: "2026-10-27T10:00:00Z", exitedDate: null }] },
-    s1: { ...session("s1", "Lead 1", "1"), history: [{ flowBlockId: E, enteredDate: "2026-10-27T10:00:00Z", exitedDate: "2026-10-27T10:05:00Z" }] }
-  }
-}, async crm => {
-  await crm.abrirBloco(E);
-  await crm.esperarLista();
-  const p = crm.page;
-  await p.locator(".dcf-tab").click();
-  await p.locator('.dcf-item[data-sid="s0"] .dcf-rp-wait').waitFor();
-  assert.equal(await p.locator('.dcf-item[data-sid="s1"] .dcf-rp-wait').count(), 0);
+  assert.deepEqual(await crm.page.getByRole("tab").allInnerTexts(), ["Entraram", "Sucessos", "Alertas", "Erros"]);
 }));
 
 test("caixinhas: reprocessa os selecionados um por vez, sessão repetida uma vez só", comCrm({
-  logs: { [`${A}|succeeded`]: [0, 1, 2].map(i => parado(A, "succeeded", i, `Lead ${i}`))
+  logs: { [`${A}|succeeded`]: [0, 1, 2].map(i => comLead(A, "succeeded", i, `Lead ${i}`))
     .concat([log(A, "succeeded", 9, { flowSessionId: "s0", lead: { name: "Lead 0" }, contactId: "5511900000000" })]) },
   reprocessStatus: id => id === "s2" ? 500 : undefined
 }, async crm => {
@@ -315,4 +251,52 @@ test("caixinhas: reprocessa os selecionados um por vez, sessão repetida uma vez
   assert.deepEqual(crm.stats.reprocessCalls.map(c => c.id), ["s0", "s2"]);
   assert.equal(await p.locator('.dcf-item[data-sid="s0"] .dcf-rp-ok').count(), 2, "os dois cards da sessão s0");
   assert.equal(await btn.innerText(), "Reprocessar selecionados (1)", "a que falhou continua marcada");
+}));
+
+// conexão no formato de /api/messaging/instances
+const conexao = (id, name, status, over = {}) => ({ id, name, status, isActive: true, deletedAt: null, provider: "UAZAPI", ...over });
+
+test("aviso de conexão: aparece, Ciente fecha, outra conexão caindo reabre", comCrm({
+  instances: [conexao("c1", "WPP API (9033)", "CONNECTED"), conexao("c2", "Daniel Cunha (6699)", "DISCONNECTED"),
+              conexao("c3", "backup equipe", "DISCONNECTED", { isActive: false })]
+}, async crm => {
+  const p = crm.page;
+  const btn = p.locator(".dcf-conn-btn");
+  await btn.waitFor();
+  assert.match(await btn.innerText(), /1 conexão desconectada/);
+  assert.equal(crm.stats.instancesCalls[0].auth, "Bearer token-teste", "usa o login da aplicação");
+  await btn.click();
+  assert.deepEqual(await p.locator(".dcf-conn-menu li").allInnerTexts(), ["Daniel Cunha (6699)"]);
+  await p.locator('.dcf-conn-menu [data-a="ack"]').click();
+  assert.equal(await p.locator(".dcf-conn").count(), 0, "Ciente fecha o aviso");
+
+  // a aplicação lista as conexões de novo (tela Conexões): a mesma queda não reabre o aviso
+  const listar = () => p.evaluate(() => window.fetch("https://messaging.g1.datacrazy.io/api/messaging/instances?take=50&skip=0",
+    { headers: { authorization: "Bearer token-teste" } }));
+  await listar();
+  await p.waitForTimeout(300);
+  assert.equal(await p.locator(".dcf-conn").count(), 0);
+
+  // outra conexão caiu: o aviso volta com as duas, a nova em destaque
+  crm.sc.instances[0].status = "DISCONNECTED";
+  await listar();
+  await btn.waitFor();
+  assert.match(await btn.innerText(), /2 conexões desconectadas/);
+  await btn.click();
+  assert.deepEqual(await p.locator(".dcf-conn-menu li.dcf-conn-new").allInnerTexts(), ["WPP API (9033)"]);
+  await p.mouse.click(5, 5);
+  assert.equal(await p.locator(".dcf-conn-menu").isHidden(), true, "clique fora fecha o menu");
+
+  // tudo conectado: o aviso some
+  crm.sc.instances.forEach(c => { c.status = "CONNECTED"; });
+  await listar();
+  await p.locator(".dcf-conn").waitFor({ state: "detached" });
+}));
+
+test("sem conexão caída não mostra aviso", comCrm({ instances: [conexao("c1", "WPP", "CONNECTED")] }, async crm => {
+  const t0 = Date.now();
+  while (!crm.stats.instancesCalls.length && Date.now() - t0 < 10000) await crm.page.waitForTimeout(100);
+  assert.equal(crm.stats.instancesCalls.length, 1);
+  await crm.page.waitForTimeout(300);
+  assert.equal(await crm.page.locator(".dcf-conn").count(), 0);
 }));

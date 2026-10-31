@@ -225,13 +225,7 @@ html.dark .dcf-bar input { color-scheme: dark; }
 .dcf-rp { padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; white-space: nowrap; }
 .dcf-rp-ok { color: #16a34a; background: #22c55e26; }
 .dcf-rp-fail { color: #dc2626; background: #ef444426; }
-.dcf-rp-wait { color: #2563eb; background: #3b82f626; }
 .dcf-chk { flex: none; align-self: center; margin: 0 -2px 0 0; cursor: pointer; }
-/* aba "Parados" (cópia da aba Erros): com ela aberta, a aba nativa ativa perde o sublinhado */
-[role="tablist"][data-dcf-stuck] > [role="tab"][data-state="active"]:not(.dcf-tab) {
-  border-bottom-width: 0 !important;
-  color: inherit !important;
-}
 .dcf-bar button[data-a="rpsel"]:not(:disabled) { background: #16a34a; border-color: #16a34a; color: #fff; }
 
 /* confirmação do reprocessar */
@@ -397,3 +391,69 @@ html.dark .dcf-bar .dcf-date-pill:hover { background: rgba(226, 75, 74, .3); }
 .dcf-date-pill:hover .dcf-desk-cal { transform: translateY(-1px) rotate(-4deg); }
 .dcf-desk-cal-mes { height: 8px; background: #e24b4a; color: #fff; font-size: 6px; line-height: 8px; text-align: center; font-weight: 600; }
 .dcf-desk-cal-dia { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #2c2c2a; }
+
+/* aviso de conexão desconectada: canto de cima, abaixo do ícone da extensão */
+.dcf-conn {
+  position: fixed;
+  top: 6px;
+  right: 12px;
+  z-index: 2147483000;
+  font: 12px/1.3 system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.dcf-conn-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 75, 74, .55);
+  background: #fdecec;
+  color: #a32d2d;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .18);
+}
+.dcf-conn-btn:hover { background: #fbdcdc; }
+.dcf-conn-dot { width: 7px; height: 7px; border-radius: 50%; background: #e24b4a; }
+.dcf-conn-caret { font-size: 10px; opacity: .8; }
+.dcf-conn-menu {
+  margin-top: 4px;
+  min-width: 200px;
+  max-width: 280px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, .3);
+  background: #fff;
+  color: #1f2937;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+}
+.dcf-conn-menu[hidden] { display: none; }
+.dcf-conn-menu ul { margin: 0 0 8px; padding: 0; list-style: none; max-height: 200px; overflow: auto; }
+.dcf-conn-menu li { padding: 3px 0 3px 12px; position: relative; }
+.dcf-conn-menu li::before {
+  content: ""; position: absolute; left: 0; top: 50%; width: 6px; height: 6px; margin-top: -3px;
+  border-radius: 50%; background: #e24b4a;
+}
+.dcf-conn-menu li.dcf-conn-new { font-weight: 600; }
+.dcf-conn-menu a { display: block; margin-bottom: 8px; color: #2563eb; text-decoration: none; }
+.dcf-conn-menu a:hover { text-decoration: underline; }
+.dcf-conn-menu button {
+  width: 100%;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 0;
+  background: #2563eb;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dcf-conn-menu button:hover { background: #1d4ed8; }
+html.dark .dcf-conn-btn { background: #3b1414; color: #f09595; }
+html.dark .dcf-conn-btn:hover { background: #4d1a1a; }
+html.dark .dcf-conn-menu { background: #0b1220; color: #e5e7eb; }
+html.dark .dcf-conn-menu a { color: #60a5fa; }
