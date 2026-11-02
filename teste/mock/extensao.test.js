@@ -18,6 +18,21 @@ const comCrm = (cenario, fn) => async () => {
   }
 };
 
+// a lista só desenha os cards perto da área visível: rola até o fim juntando os nomes
+const nomesRolando = crm => crm.page.evaluate(async () => {
+  const v = [...document.querySelectorAll(".dcf-list")].find(l => l.offsetParent !== null);
+  let sc = v; // quem rola pode ser a lista ou um painel acima dela
+  while (sc.parentElement && sc.scrollHeight <= sc.clientHeight) sc = sc.parentElement;
+  const nomes = new Map();
+  for (let top = 0; ; top += sc.clientHeight) {
+    sc.scrollTop = top;
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    v.querySelectorAll(".dcf-item").forEach(e => nomes.set(e.dataset.id, e.querySelector(".dcf-name").textContent));
+    if (top >= sc.scrollHeight - sc.clientHeight) break;
+  }
+  return [...nomes.values()];
+});
+
 test("início com webhook: nome e telefone vêm da sessão", comCrm({
   logs: { [`${I}|succeeded`]: [0, 1, 2].map(i => log(I, "succeeded", i)) },
   sessions: {
@@ -93,7 +108,7 @@ test("paginação: servidor manda 93 por página e a lista junta 250 sem repetir
   await crm.abrirBloco(A);
   await crm.esperarLista();
   assert.equal(await crm.contador(), "Mostrando 250 de 250");
-  assert.equal(new Set((await crm.itens()).map(i => i.name)).size, 250);
+  assert.equal(new Set(await nomesRolando(crm)).size, 250);
 }));
 
 test("página de logs com erro 500: mostra o que veio, com aviso de incompleto", comCrm({
@@ -124,7 +139,7 @@ test("busca por telefone com máscara e CSV só com o filtrado", comCrm({
   await crm.abrirBloco(I);
   await crm.esperarLista();
   await crm.page.fill('.dcf-bar input[data-k="q"]', "(21) 91234-5678");
-  assert.equal(await crm.contador(), "Mostrando 1 de 2");
+  await crm.page.waitForFunction(() => document.querySelector(".dcf-count").textContent === "Mostrando 1 de 2");
   assert.deepEqual((await crm.itens()).map(i => i.name), ["João Exemplo"]);
   const [dl] = await Promise.all([crm.page.waitForEvent("download"), crm.page.click('.dcf-bar [data-a="csv"]')]);
   assert.match(dl.suggestedFilename(), /^logs-sucessos-\d{4}-\d{2}-\d{2}_\d{4}\.csv$/);
@@ -251,6 +266,38 @@ test("caixinhas: reprocessa os selecionados um por vez, sessão repetida uma vez
   assert.deepEqual(crm.stats.reprocessCalls.map(c => c.id), ["s0", "s2"]);
   assert.equal(await p.locator('.dcf-item[data-sid="s0"] .dcf-rp-ok').count(), 2, "os dois cards da sessão s0");
   assert.equal(await btn.innerText(), "Reprocessar selecionados (1)", "a que falhou continua marcada");
+}));
+
+test("lista grande: desenha só perto da área visível, sessões visíveis primeiro, rolagem não pula", comCrm({
+  logs: { [`${I}|succeeded`]: Array.from({ length: 1000 }, (_, i) => log(I, "succeeded", i, i < 900 ? { lead: { name: `L${i}` }, contactId: `55119${i}` } : {})) },
+  sessions: Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`s${900 + i}`, session(`s${900 + i}`, `Pessoa ${900 + i}`, `55119${900 + i}`)])),
+  sessionDelay: 30
+}, async crm => {
+  const p = crm.page;
+  await crm.abrirBloco(I);
+  await p.locator(".dcf-list .dcf-item").first().waitFor();
+  assert.ok(await p.locator(".dcf-item").count() < 300, "não desenha os 1000 cards");
+  assert.equal(await crm.contador(), "Mostrando 1000 de 1000");
+
+  // rola até o fim durante a busca das sessões: os cards do fim aparecem e a rolagem fica onde está
+  const painel = () => document.querySelector("#sheet"); // no CRM falso quem rola é o painel
+  await p.waitForFunction(() => {
+    const sc = document.querySelector("#sheet");
+    sc.scrollTop = sc.scrollHeight; // a altura muda conforme os blocos são desenhados
+    return document.querySelector('.dcf-item[data-sid="s999"]');
+  }, null, { polling: 100 });
+  const naoRolou = await p.evaluate(`(${painel})().scrollTop`);
+  await p.waitForFunction(() => /Pessoa 999/.test(document.querySelector('.dcf-item[data-sid="s999"] .dcf-name')?.textContent));
+  assert.ok(Math.abs(await p.evaluate(`(${painel})().scrollTop`) - naoRolou) < 400, "a rolagem não volta ao topo");
+  assert.ok(await p.locator(".dcf-item").count() < 300, "cards antigos saem da tela");
+  await crm.esperarLista();
+
+  // volta ao topo: cards redesenhados, filtro continua funcionando
+  await p.evaluate(`(${painel})().scrollTop = 0`);
+  await p.locator('.dcf-item[data-sid="s0"]').waitFor();
+  await p.fill('.dcf-bar input[data-k="q"]', "pessoa 950");
+  await p.waitForFunction(() => document.querySelector(".dcf-count").textContent === "Mostrando 1 de 1000");
+  assert.deepEqual((await crm.itens()).map(i => i.name), ["Pessoa 950"]);
 }));
 
 // conexão no formato de /api/messaging/instances

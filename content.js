@@ -8,15 +8,19 @@
           downConns, messagingOrigin } = dcfLib;
   const PAGE_SIZE = 200;
   const REQUEST_TIMEOUT = 30000;
-  const MAX_RENDER = 3000; // acima disso a lista na tela é cortada (o CSV leva tudo)
+  const CHUNK_ROWS = 50;   // linhas por bloco da lista; só os blocos perto da área visível têm cards
+  const CHUNK_MARGIN = 600; // px além da área visível que já ficam desenhados
+  const ROW_ESTIMATE = 84; // altura estimada da linha (px) até o bloco ser desenhado
   const PARALLEL = 3;      // páginas buscadas ao mesmo tempo
   const RETENTION_DAYS = 7; // o Datacrazy só guarda 7 dias de log
+  const SEARCH_WAIT = 200; // ms sem digitar antes de filtrar
 
   // Estado global (mantido ao trocar entre Entraram/Sucessos/Alertas/Erros)
   const state = { q: "", from: "", to: "", unique: false, onlyDup: false };
   const bars = new Map(); // list element -> bar element
   const api = new Map();  // list element -> { items, from, to, key, view } quando carregado pela API
   let lastReq = null;     // última chamada da aplicação à rota de logs { url, headers }
+  let searchTimer = null;
   let pendingAuto = null; // bloco/aba que acabou de abrir e ainda não foi carregado pela API
   let auto = true;        // "Carregar tudo" sozinho ao abrir um bloco/aba
   try { auto = localStorage.getItem("dcf-auto") !== "0"; } catch {}
@@ -273,27 +277,89 @@
       </div>`;
   }
 
+  // Lista em blocos: bloco longe da área visível fica vazio, só com a altura. Assim a página não
+  // carrega milhares de cards, e o que muda redesenha só os cards que estão na tela.
   function renderApi(list, a) {
     const items = filterItems(a.items);
     const vis = items.filter(i => i.visible);
-    const shown = vis.slice(0, MAX_RENDER);
+    const same = a.vis?.length === vis.length && vis.every((it, i) => it === a.vis[i]);
+    a.vis = vis;
+    if (same) patchChunks(a); else buildChunks(a, vis);
+    setCount(list, vis.length, items.length, a.error ? ` – incompleto: ${a.error}` : "");
+    return items;
+  }
+
+  function buildChunks(a, vis) {
     // separador por dia, com a contagem de logs visíveis daquele dia
     const perDay = {};
     for (const it of vis) { const k = it.date.toDateString(); perDay[k] = (perDay[k] || 0) + 1; }
-    let html = "", lastDay = "";
-    for (const it of shown) {
+    const dayRow = it => `<div class="dcf-day"><span>${dayLabel(it.date)}</span><span>${perDay[it.date.toDateString()].toLocaleString("pt-BR")}</span></div>`;
+    a.chunks = [];
+    let rows = null, lastDay = "";
+    for (const it of vis) {
       const k = it.date.toDateString();
-      if (k !== lastDay) {
-        html += `<div class="dcf-day"><span>${dayLabel(it.date)}</span><span>${perDay[k].toLocaleString("pt-BR")}</span></div>`;
-        lastDay = k;
-      }
-      html += itemHtml(it);
+      // bloco novo repete o separador: ele fica fixo no topo só dentro do próprio bloco
+      if (!rows || rows.length >= CHUNK_ROWS) {
+        rows = [dayRow(it)];
+        a.chunks.push({ rows, html: null, height: 0, el: null });
+      } else if (k !== lastDay) rows.push(dayRow(it));
+      lastDay = k;
+      rows.push(it);
     }
-    a.view.innerHTML = html || `<div class="dcf-empty">Nenhum log no filtro.</div>`;
-    setCount(list, vis.length, items.length,
-      (vis.length > MAX_RENDER ? ` (tela: ${MAX_RENDER})` : "") + (a.error ? ` – incompleto: ${a.error}` : ""));
-    return items;
+    for (const c of a.chunks) c.height = c.rows.length * ROW_ESTIMATE;
+    a.view.innerHTML = a.chunks.map(c => `<div class="dcf-chunk" style="height:${c.height}px"></div>`).join("")
+      || `<div class="dcf-empty">Nenhum log no filtro.</div>`;
+    a.chunks.forEach((c, i) => { c.el = a.view.children[i]; });
+    syncChunks(a);
   }
+
+  const rowHtml = row => (typeof row === "string" ? row : itemHtml(row).trim());
+
+  // desenha os blocos perto da área visível e esvazia os outros, guardando a altura
+  function syncChunks(a) {
+    if (a.view.offsetParent === null) return; // lista escondida: desenha quando aparecer
+    const box = a.view.getBoundingClientRect();
+    const top = Math.max(box.top, 0) - CHUNK_MARGIN, bottom = Math.min(box.bottom, innerHeight) + CHUNK_MARGIN;
+    for (const c of a.chunks) {
+      const r = c.el.getBoundingClientRect();
+      const near = r.bottom >= top && r.top <= bottom;
+      if (near && !c.html) {
+        c.html = c.rows.map(rowHtml);
+        c.el.innerHTML = c.html.join("");
+        c.el.style.height = "";
+      } else if (!near && c.html) {
+        c.height = c.el.offsetHeight;
+        c.el.style.height = `${c.height}px`;
+        c.el.textContent = "";
+        c.html = null;
+      }
+    }
+  }
+
+  // troca só os cards desenhados que mudaram (não perde rolagem nem foco)
+  function patchChunks(a) {
+    for (const c of a.chunks) {
+      if (!c.html) continue;
+      c.rows.forEach((row, i) => {
+        const html = rowHtml(row);
+        if (html !== c.html[i]) { c.el.children[i].outerHTML = html; c.html[i] = html; }
+      });
+    }
+  }
+
+  let syncQueued = false;
+  function queueSync() {
+    if (syncQueued || !api.size) return;
+    syncQueued = true;
+    requestAnimationFrame(() => {
+      syncQueued = false;
+      for (const a of api.values()) if (a.chunks) syncChunks(a);
+    });
+  }
+  // captura: a rolagem pode ser da lista ou de um painel acima dela
+  document.addEventListener("scroll", queueSync, { capture: true, passive: true });
+  window.addEventListener("resize", queueSync);
+  const listResize = new ResizeObserver(queueSync); // lista escondida que volta a aparecer
 
   function enterApi(list, data) {
     exitApi(list);
@@ -311,6 +377,7 @@
     list.classList.add("dcf-native-off");
     picked.clear();
     api.set(list, { ...data, view });
+    listResize.observe(view);
     updatePickBar(list);
     apply(list);
     enrich(list);
@@ -342,12 +409,20 @@
   async function enrich(list) {
     const a = api.get(list);
     const todo = a.items.filter(it => it.sessionId && (!it.phone || !(it.lead || it.contact)));
-    let i = 0, timer;
+    const pending = new Set(todo);
+    // cards desenhados primeiro, depois o resto da lista
+    const next = () => {
+      for (const c of a.chunks) if (c.html) for (const r of c.rows) if (pending.has(r)) { pending.delete(r); return r; }
+      const [it] = pending;
+      pending.delete(it);
+      return it;
+    };
+    let timer = null;
     if (todo.length) a.view.dataset.dcfSessions = "loading"; // sinal para o teste real (teste/real)
-    const redraw = () => { clearTimeout(timer); timer = setTimeout(() => api.get(list) === a && apply(list), 250); };
+    const redraw = () => { timer ??= setTimeout(() => { timer = null; if (api.get(list) === a) apply(list); }, 250); };
     const worker = async () => {
-      while (i < todo.length && api.get(list) === a) {
-        const it = todo[i++];
+      while (pending.size && api.get(list) === a) {
+        const it = next();
         const { name, phone } = await fetchPerson(it.sessionId);
         const add = [];
         if (name && !it.lead && !it.contact) add.push((it.lead = name));
@@ -364,6 +439,7 @@
   function exitApi(list) {
     const a = api.get(list);
     if (!a) return;
+    listResize.unobserve(a.view);
     a.view.remove();
     list.classList.remove("dcf-native-off");
     api.delete(list);
@@ -393,13 +469,9 @@
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   }
 
-  // redesenha só os cards da sessão (a lista inteira perderia o que está aberto)
-  function redrawSession(sessionId) {
-    for (const a of api.values())
-      a.view.querySelectorAll(`.dcf-item[data-sid="${CSS.escape(sessionId)}"]`).forEach(el => {
-        const it = a.items.find(i => i.id === el.dataset.id);
-        if (it) el.outerHTML = itemHtml(it);
-      });
+  // redesenha só os cards que mudaram (a lista inteira perderia o que está aberto)
+  function redrawCards() {
+    for (const a of api.values()) if (a.chunks) patchChunks(a);
   }
 
   // confirmação no estilo do modal de inspeção; resolve true só no Confirmar
@@ -431,7 +503,7 @@
   async function runReprocess(it) {
     const key = `${it.sessionId}|${it.blockId}`;
     reproc.set(key, { st: "busy" });
-    redrawSession(it.sessionId);
+    redrawCards();
     try {
       await reprocess(it.sessionId, it.blockId);
       reproc.set(key, { st: "ok", at: Date.now() });
@@ -441,7 +513,7 @@
       reproc.set(key, { st: "fail", msg: err.message });
       saveReproc(); // falhou depois de um "ok" antigo: a tag antiga sai
     }
-    redrawSession(it.sessionId);
+    redrawCards();
     return reproc.get(key).st === "ok";
   }
 
@@ -472,7 +544,7 @@
     if (!it) return;
     const k = `${it.sessionId}|${it.blockId}`;
     if (on) picked.add(k); else picked.delete(k);
-    redrawSession(it.sessionId); // outros cards da mesma sessão acompanham
+    redrawCards(); // outros cards da mesma sessão acompanham
     updatePickBar(list);
   }
 
@@ -787,7 +859,10 @@
       if (inp.type === "checkbox") inp.checked = state[k]; else inp.value = state[k];
       inp.addEventListener("input", () => {
         state[k] = inp.type === "checkbox" ? inp.checked : inp.value;
-        bars.forEach((_, l) => apply(l));
+        clearTimeout(searchTimer);
+        // busca: espera a pessoa parar de digitar
+        if (k === "q") searchTimer = setTimeout(() => bars.forEach((_, l) => apply(l)), SEARCH_WAIT);
+        else bars.forEach((_, l) => apply(l));
         if (k === "from" || k === "to") updateRetentionNote();
         // período mudou com dados da API na tela: busca de novo com o novo período
         if ((k === "from" || k === "to") && api.has(list)) {

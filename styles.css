@@ -61,6 +61,7 @@ html.dark .dcf-bar input { color-scheme: dark; }
   padding-right: 20px;
   font-size: 12px;
 }
+.dcf-chunk { flex: none; display: flex; flex-direction: column; gap: 8px; }
 .dcf-item {
   --k: #a1a1aa;
   display: flex;

@@ -85,9 +85,20 @@ if (!/^https:\/\/crm\.datacrazy\.io\/flow\//.test(url || "")) {
       return v && !v.dataset.dcfSessions && !document.querySelector(".dcf-loading");
     }, null, { timeout: LISTA_TIMEOUT });
     await page.waitForTimeout(500);
-    Object.assign(r, await page.evaluate(() => {
+    Object.assign(r, await page.evaluate(async () => {
       const v = [...document.querySelectorAll(".dcf-list")].find(l => l.offsetParent !== null);
-      const itens = [...v.querySelectorAll(".dcf-item")];
+      // a lista só desenha os cards perto da área visível: rola até o fim juntando todos
+      let sc = v; // quem rola pode ser a lista ou um painel acima dela
+      while (sc.parentElement && sc.scrollHeight <= sc.clientHeight) sc = sc.parentElement;
+      const porId = new Map();
+      for (let top = 0; ; top += sc.clientHeight) {
+        sc.scrollTop = top;
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        v.querySelectorAll(".dcf-item").forEach(e => porId.set(e.dataset.id, e.cloneNode(true)));
+        if (top >= sc.scrollHeight - sc.clientHeight) break;
+      }
+      sc.scrollTop = 0;
+      const itens = [...porId.values()];
       const contador = [...document.querySelectorAll(".dcf-count")].find(c => c.offsetParent !== null)?.textContent || "";
       return {
         extensao: +(contador.match(/de ([\d.]+)/)?.[1] || "0").replace(/\./g, ""),
