@@ -981,11 +981,29 @@
   }
 
   function renderConns() {
-    if (!conns.some(c => !connAck.has(c.id))) return void connBox?.remove();
+    if (!conns.some(c => !connAck.has(c.id))) {
+      setConnMenu(false);
+      return void connBox?.remove();
+    }
     if (!connBox) {
       connBox = document.createElement("div");
       connBox.className = "dcf-conn";
       connBox.setAttribute("role", "alert");
+      connBox.innerHTML = `
+        <button type="button" class="dcf-conn-btn" data-a="toggle" aria-expanded="false" title="Ver conexões">
+          <span class="dcf-conn-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m19 5 3-3M2 22l3-3M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4ZM7.5 13.5 10 11M10.5 16.5 13 14M12 6l6 6 2.3-2.3a2.4 2.4 0 0 0 0-3.4l-2.6-2.6a2.4 2.4 0 0 0-3.4 0Z"/></svg>
+          </span>
+          <span class="dcf-conn-title"></span>
+          <svg class="dcf-conn-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="dcf-conn-menu" hidden>
+          <ul></ul>
+          <div class="dcf-conn-actions">
+            <a href="/config/instances">Abrir Conexões</a>
+            <button type="button" data-a="ack">Ciente</button>
+          </div>
+        </div>`;
       connBox.addEventListener("click", e => {
         const a = e.target.closest("[data-a]")?.dataset.a;
         if (a === "toggle") setConnMenu(connBox.querySelector(".dcf-conn-menu").hidden);
@@ -993,21 +1011,17 @@
       });
     }
     const n = conns.length;
-    const open = connBox.querySelector(".dcf-conn-menu")?.hidden === false;
-    connBox.innerHTML = `
-      <button type="button" class="dcf-conn-btn" data-a="toggle" aria-expanded="${open}" title="Ver conexões">
-        <span class="dcf-conn-dot"></span>${n} ${n === 1 ? "conexão desconectada" : "conexões desconectadas"}<span class="dcf-conn-caret">▾</span>
-      </button>
-      <div class="dcf-conn-menu" ${open ? "" : "hidden"}>
-        <ul>${conns.map(c => `<li${connAck.has(c.id) ? "" : ' class="dcf-conn-new"'}>${escHtml(c.name)}</li>`).join("")}</ul>
-        <a href="/config/instances">Abrir Conexões</a>
-        <button type="button" data-a="ack">Ciente</button>
-      </div>`;
+    connBox.querySelector(".dcf-conn-title").textContent = `${n} ${n === 1 ? "conexão desconectada" : "conexões desconectadas"}`;
+    connBox.querySelector("ul").innerHTML = conns.map(c =>
+      `<li${connAck.has(c.id) ? "" : ' class="dcf-conn-new"'} title="${escHtml(c.name)}"><span>${escHtml(c.name)}</span></li>`).join("");
+    // "Nova" só faz sentido quando há queda antiga na lista
+    connBox.classList.toggle("dcf-conn-mix", conns.some(c => connAck.has(c.id)));
     if (!connBox.isConnected) document.body.appendChild(connBox);
   }
 
   function setConnMenu(open) {
     if (!connBox) return;
+    connBox.classList.toggle("dcf-conn-open", open);
     connBox.querySelector(".dcf-conn-menu").hidden = !open;
     connBox.querySelector(".dcf-conn-btn").setAttribute("aria-expanded", open);
   }
